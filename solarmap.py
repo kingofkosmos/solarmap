@@ -46,14 +46,14 @@ planet_symbols = {
 
 # Mid-tone astrology-based colors for planets
 planet_colors = {
-    'Mercury': '#8888aa',   # mid lavender/gray
-    'Venus':   '#ff80a0',   # mid pink
-    'Earth':   '#3399ff',   # mid blue
+    'Mercury': '#815313',   # mid brown
+    'Venus':   '#3cb371',   # mid green
+    'Earth':   '#276ab3',   # mid deep blue
     'Mars':    '#ff6666',   # mid red
-    'Jupiter': '#ffcc66',   # mid orange/yellow
-    'Saturn':  '#ffe066',   # mid yellow
-    'Uranus':  '#66ffe0',   # mid cyan
-    'Neptune': '#6666cc'    # mid purple/blue
+    'Jupiter': "#ffb625",   # mid orange
+    'Saturn':  "#888888",   # mid grey
+    'Uranus':  '#3399ff',   # mid light blue
+    'Neptune': '#6666cc'    # mid purple
 }
 
 # Plot planets at their respective radii
