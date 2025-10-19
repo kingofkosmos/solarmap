@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 200 200">
+  <circle cx="100" cy="100" r="100" fill="#3cb371"/>
+  <text x="100" y="160"
+        font-size="200"
+        font-family="DejaVu Sans, Arial Unicode MS, sans-serif"
+        text-anchor="middle"
+        fill="white"
+        stroke="white"
+        stroke-width="10"
+        paint-order="stroke fill">♀</text>
+</svg>
