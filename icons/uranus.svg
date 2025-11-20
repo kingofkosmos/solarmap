@@ -1,8 +1,43 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 200 200">
-  <circle cx="100" cy="100" r="100" fill="#3399ff"/>
-  <text x="100" y="180"
-        font-size="200"
-        font-family="DejaVu Sans, Arial Unicode MS, sans-serif"
-        text-anchor="middle"
-        fill="white">♅</text>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Designed by Vexels.com - 2021 All Rights Reserved - https://vexels.com/terms-and-conditions/  -->
+
+<svg
+   version="1.1"
+   id="Capa_1"
+   x="0px"
+   y="0px"
+   viewBox="0 0 107.04 163.27249"
+   enable-background="new 0 0 1200 1200"
+   xml:space="preserve"
+   width="107.04"
+   height="163.27249"
+   sodipodi:docname="uranus.svg"
+   inkscape:version="1.4.2 (f4327f4, 2025-05-13)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><sodipodi:namedview
+   id="namedview1"
+   pagecolor="#505050"
+   bordercolor="#ffffff"
+   borderopacity="1"
+   inkscape:showpageshadow="0"
+   inkscape:pageopacity="0"
+   inkscape:pagecheckerboard="1"
+   inkscape:deskcolor="#505050"
+   inkscape:zoom="0.01"
+   inkscape:cx="157950"
+   inkscape:cy="1041400"
+   inkscape:window-width="2560"
+   inkscape:window-height="1330"
+   inkscape:window-x="-12"
+   inkscape:window-y="-12"
+   inkscape:window-maximized="1"
+   inkscape:current-layer="Capa_1" /><defs
+   id="defs324" />
+<path
+   fill="#253166"
+   d="m 107.03975,80.72 c 0.09,-28.81 -24.007003,-53.69 -53.554003,-53.55 -3.062,-1.19 -4.254,4.37 -8.657,-5.76 -8.978,-16.27 -12.972,-21.19 -17.183,-21.41 -9.533,3.12 -5.217,19.27 -3.284,35.84 -21.097,12.85 -31.575,44.67 -18.804,68.75 23.453,41.82 46.587,17.21 54.136,39.42 11.543,22.28 25.917,34.43 19.273,-16.2 16.138,-8.58 28.107003,-27.04 28.073003,-47.09 z m -48.244003,46.7 c -8.617,-25.11 -29.861,-71.36 -24.212,-89.73 70.981003,-25.17 91.890003,79.55 24.212,89.73 z m -6.937,0.24 c -46.776,-2.47 -60.031,-60.04 -26.188,-84.76 5.211,26.17 15.223,59.41 26.188,84.76 z M 28.685747,7.84 c 3.407,3.91 9.932,15.72 12.636,20.77 -3.769,0.88 -7.374,2.17 -10.792,3.8 -1.874,-11 -2.624,-19.79 -1.844,-24.57 z m 45.43,146.58 c -4.124,-4.91 -8.351,-12.16 -12.491,-20.83 3.856,-0.6 7.575,-1.59 11.116,-2.96 1.147,9 1.801,18.91 1.375,23.79 z"
+   id="path312"
+   style="fill:#ffffff" />
 </svg>

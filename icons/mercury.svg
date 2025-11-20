@@ -1,8 +1,43 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 200 200">
-  <circle cx="100" cy="100" r="100" fill="#815313"/>
-  <text x="100" y="160"
-        font-size="200"
-        font-family="DejaVu Sans, Arial Unicode MS, sans-serif"
-        text-anchor="middle"
-        fill="white">☿</text>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Designed by Vexels.com - 2021 All Rights Reserved - https://vexels.com/terms-and-conditions/  -->
+
+<svg
+   version="1.1"
+   id="Capa_1"
+   x="0px"
+   y="0px"
+   viewBox="0 0 35.045398 35.77"
+   enable-background="new 0 0 1200 1200"
+   xml:space="preserve"
+   width="35.045399"
+   height="35.77"
+   sodipodi:docname="mercury.svg"
+   inkscape:version="1.4.2 (f4327f4, 2025-05-13)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><sodipodi:namedview
+   id="namedview1"
+   pagecolor="#505050"
+   bordercolor="#ffffff"
+   borderopacity="1"
+   inkscape:showpageshadow="0"
+   inkscape:pageopacity="0"
+   inkscape:pagecheckerboard="1"
+   inkscape:deskcolor="#505050"
+   inkscape:zoom="0.024882573"
+   inkscape:cx="887388.12"
+   inkscape:cy="774598.34"
+   inkscape:window-width="2560"
+   inkscape:window-height="1330"
+   inkscape:window-x="-12"
+   inkscape:window-y="-12"
+   inkscape:window-maximized="1"
+   inkscape:current-layer="Capa_1" /><defs
+   id="defs324" />
+<path
+   fill="#253166"
+   d="m 17.522699,0 c -23.9399997,1.03 -22.7799997,35.02 0,35.77 23.94,-1.03 22.78,-35.03 0,-35.77 z"
+   id="path304"
+   style="fill:#ffffff" />
 </svg>
