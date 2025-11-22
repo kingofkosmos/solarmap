@@ -1,4 +1,4 @@
-from astronomy import Time, Body, EclipticLongitude
+from astronomy import Time, Body, EclipticLongitude, GeoVector
 import math
 import matplotlib.pyplot as plt
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
@@ -7,7 +7,6 @@ import io
 import cairosvg
 
 
-#TODO: Custom time input (for testing)
 #TODO: Optional starry background (generated stars or image?)
 #TODO: Optional colors to planets, black & whitw or colored
 #TODO: Optional colors to rings
@@ -17,11 +16,16 @@ import cairosvg
 #TODO: Moons (Earth's Moon, Galilean moons, Titan, etc.)
 #TODO: Dwarf planets (Pluto, Ceres, Haumea, Makemake, Eris)
 #TODO: Comets (Halley, Hale-Bopp)
+#TODO: Custom time input
+
+
 
 
 # Planet list
 planets = [Body.Mercury, Body.Venus, Body.Earth, Body.Mars,
     Body.Jupiter, Body.Saturn, Body.Uranus, Body.Neptune]
+
+
 
 
 # Convert planet SVG icons to OffsetImages
@@ -32,9 +36,13 @@ def svg_to_imagebox(svg_path, zoom=0.1):
     return OffsetImage(image, zoom=zoom)
 
 
+
+
 # Get current time and calculate ecliptic longitudes (angles from the Sun)
-utc = Time.Now()
+utc = Time.Now().AddDays(0) # AddDays for testing
 longitudes = {planet.name: EclipticLongitude(planet, utc) for planet in planets}
+
+
 
 
 # Canvas setup
@@ -43,6 +51,8 @@ fig.patch.set_facecolor('black')
 ax.set_facecolor('black')
 cx, cy = 0.0, 0.0
 r_base = 1.0
+
+
 
 
 # Rings
@@ -61,19 +71,18 @@ for _ in range(5, 8): # Rings 6 to 8
 for r in rings: # Draw rings, dashed lines
     ax.add_patch(plt.Circle((cx, cy), r, fill=False, lw=0.4, color='white', linestyle=(0, (10, 10))))
 
-
-# Radii for each planet
+#   Radii for each planet
 planet_radii = {p.name: rings[i] for i, p in enumerate(planets)}
+
+
 
 
 # Plot objects
 #   Sun
-try:
-    sun_imagebox = svg_to_imagebox("icons/sun.svg", zoom=0.3)
-    sun_ab = AnnotationBbox(sun_imagebox, (cx, cy), frameon=False)
-    ax.add_artist(sun_ab)
-except Exception as e:
-    print(f"⚠️ Could not load sun.svg: {e}")
+sun_imagebox = svg_to_imagebox("icons/sun.svg", zoom=0.3)
+sun_ab = AnnotationBbox(sun_imagebox, (cx, cy), frameon=False)
+ax.add_artist(sun_ab)
+
 #   Planets
 for name, L in longitudes.items():
     L = L % 360.0
@@ -82,20 +91,19 @@ for name, L in longitudes.items():
     r = planet_radii.get(name, 1.0)
     x = cx + r * math.cos(theta)
     y = cy + r * math.sin(theta)
+
 #   Store Earth's position
     if name == "Earth":
         earth_x, earth_y = x, y
+
 #   Plot planet icons
     svg_path = f"icons/{name.lower()}.svg"
-    try:
-        imagebox = svg_to_imagebox(svg_path, zoom=0.2)
-        ab = AnnotationBbox(imagebox, (x, y), frameon=False)
-        ax.add_artist(ab)
-    except Exception as e:
-        print(f"⚠️ Could not load {svg_path}: {e}")
+    imagebox = svg_to_imagebox(svg_path, zoom=0.2)
+    ab = AnnotationBbox(imagebox, (x, y), frameon=False)
+    ax.add_artist(ab)
 
-
-# Earth Moon ring
+# Earth's Moon
+#   Ring around Earth
 earth_ring_r = r_base / 10
 ax.add_patch(
     plt.Circle(
@@ -106,12 +114,29 @@ ax.add_patch(
         color='white',
         linestyle=(0, (4, 4))))
 
+# Get Moon's position relative to Earth
+moon_vec = GeoVector(Body.Moon, utc, True)
+moon_angle = math.degrees(math.atan2(moon_vec.y, moon_vec.x))
+moon_theta_deg = 0 - moon_angle
+moon_theta = math.radians(-moon_theta_deg)
+moon_x = earth_x + earth_ring_r * math.cos(moon_theta)
+moon_y = earth_y + earth_ring_r * math.sin(moon_theta)
+
+# Plot Moon icon
+moon_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.08)
+moon_ab = AnnotationBbox(moon_imagebox, (moon_x, moon_y), frameon=False)
+ax.add_artist(moon_ab)
+
+
+
 
 # Canvas limits and aspect
 ax.set_aspect('equal', 'box')
 ax.set_xlim(-1.3, 1.3)
 ax.set_ylim(-1.3, 1.3)
 ax.axis('off')
+
+
 
 
 # Save and show
