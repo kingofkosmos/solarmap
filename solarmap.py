@@ -6,9 +6,23 @@ import matplotlib.image as mpimg
 import io
 import cairosvg
 
+
+#TODO: Custom time input (for testing)
+#TODO: Optional starry background (generated stars or image?)
+#TODO: Optional colors to planets, black & whitw or colored
+#TODO: Optional colors to rings
+#TODO: Optional colors to background
+#TODO: Asteroid belt SVG icon
+#TODO: Asteroid belt rotation (basic and advanced with different speeds?)
+#TODO: Moons (Earth's Moon, Galilean moons, Titan, etc.)
+#TODO: Dwarf planets (Pluto, Ceres, Haumea, Makemake, Eris)
+#TODO: Comets (Halley, Hale-Bopp)
+
+
 # Planet list
 planets = [Body.Mercury, Body.Venus, Body.Earth, Body.Mars,
     Body.Jupiter, Body.Saturn, Body.Uranus, Body.Neptune]
+
 
 # Convert planet SVG icons to OffsetImages
 def svg_to_imagebox(svg_path, zoom=0.1):
@@ -17,9 +31,11 @@ def svg_to_imagebox(svg_path, zoom=0.1):
     image = mpimg.imread(io.BytesIO(png_bytes), format='png')
     return OffsetImage(image, zoom=zoom)
 
+
 # Get current time and calculate ecliptic longitudes (angles from the Sun)
 utc = Time.Now()
 longitudes = {planet.name: EclipticLongitude(planet, utc) for planet in planets}
+
 
 # Canvas setup
 fig, ax = plt.subplots(figsize=(6, 6))
@@ -27,6 +43,7 @@ fig.patch.set_facecolor('black')
 ax.set_facecolor('black')
 cx, cy = 0.0, 0.0
 r_base = 1.0
+
 
 # Rings
 rings = []
@@ -44,19 +61,20 @@ for _ in range(5, 8): # Rings 6 to 8
 for r in rings: # Draw rings, dashed lines
     ax.add_patch(plt.Circle((cx, cy), r, fill=False, lw=0.4, color='white', linestyle=(0, (10, 10))))
 
+
 # Radii for each planet
 planet_radii = {p.name: rings[i] for i, p in enumerate(planets)}
 
 
 # Plot objects
-#    Sun
+#   Sun
 try:
     sun_imagebox = svg_to_imagebox("icons/sun.svg", zoom=0.3)
     sun_ab = AnnotationBbox(sun_imagebox, (cx, cy), frameon=False)
     ax.add_artist(sun_ab)
 except Exception as e:
     print(f"⚠️ Could not load sun.svg: {e}")
-#    Planets
+#   Planets
 for name, L in longitudes.items():
     L = L % 360.0
     theta_deg = 0 - L
@@ -64,7 +82,10 @@ for name, L in longitudes.items():
     r = planet_radii.get(name, 1.0)
     x = cx + r * math.cos(theta)
     y = cy + r * math.sin(theta)
-
+#   Store Earth's position
+    if name == "Earth":
+        earth_x, earth_y = x, y
+#   Plot planet icons
     svg_path = f"icons/{name.lower()}.svg"
     try:
         imagebox = svg_to_imagebox(svg_path, zoom=0.2)
@@ -72,6 +93,18 @@ for name, L in longitudes.items():
         ax.add_artist(ab)
     except Exception as e:
         print(f"⚠️ Could not load {svg_path}: {e}")
+
+
+# Earth Moon ring
+earth_ring_r = r_base / 10
+ax.add_patch(
+    plt.Circle(
+        (earth_x, earth_y),
+        earth_ring_r,
+        fill=False,
+        lw=0.4,
+        color='white',
+        linestyle=(0, (4, 4))))
 
 
 # Canvas limits and aspect
