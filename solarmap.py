@@ -5,17 +5,22 @@ from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import matplotlib.image as mpimg
 import io
 import cairosvg
+import numpy as np
 
+#Feature improvements
+#TODO: Dwarf planets (Pluto, Ceres, Haumea, Makemake, Eris)
+#TODO: Asteroid belt SVG icon (one or multiple clusters?)
+#TODO: Asteroid belt rotation (one or multiple?))
+#TODO: Moons (Galilean moons, Titan, Mars moons)
+#TODO: Comets (Halley, Hale-Bopp)
 
-#TODO: Optional starry background (generated stars or image?)
-#TODO: Optional colors to planets, black & whitw or colored
+#Visual improvements
+#TODO: Optional labels for planets
+#TODO: Optional background stars
+#TODO: Optional colors to planets, b&w or colored
 #TODO: Optional colors to rings
 #TODO: Optional colors to background
-#TODO: Asteroid belt SVG icon
-#TODO: Asteroid belt rotation (basic and advanced with different speeds?)
-#TODO: Moons (Earth's Moon, Galilean moons, Titan, etc.)
-#TODO: Dwarf planets (Pluto, Ceres, Haumea, Makemake, Eris)
-#TODO: Comets (Halley, Hale-Bopp)
+#TODO: Optional rings fading with distance/time
 #TODO: Custom time input
 
 
@@ -46,11 +51,49 @@ longitudes = {planet.name: EclipticLongitude(planet, utc) for planet in planets}
 
 
 # Canvas setup
-fig, ax = plt.subplots(figsize=(6, 6))
+#   Set wallpaper resolution
+width_px = 2560
+height_px = 1440
+dpi = 200 # Set planet size by changing dpi
+
+fig, ax = plt.subplots(figsize=(1, 1))
+fig.set_size_inches(width_px/dpi, height_px/dpi)
 fig.patch.set_facecolor('black')
 ax.set_facecolor('black')
 cx, cy = 0.0, 0.0
 r_base = 1.0
+
+
+
+
+# Background stars
+#   Calculate aspect-aware limits for stars
+fig_width, fig_height = fig.get_size_inches()
+aspect = fig_width / fig_height
+if aspect > 1:  # Wider than tall
+    star_xlim = (-1.3 * aspect, 1.3 * aspect)
+    star_ylim = (-1.3, 1.3)
+else:  # Taller than wide
+    star_xlim = (-1.3, 1.3)
+    star_ylim = (-1.3 / aspect, 1.3 / aspect)
+
+#   Generate stars
+import numpy as np
+np.random.seed(12345)
+
+#   Base stars
+num_stars = 200
+star_x = np.random.uniform(star_xlim[0], star_xlim[1], num_stars)
+star_y = np.random.uniform(star_ylim[0], star_ylim[1], num_stars)
+star_sizes = np.random.uniform(0.1, 1.5, num_stars)
+ax.scatter(star_x, star_y, s=star_sizes, c='white', alpha=0.3, marker='.')
+
+#   Dense band
+band_stars = 1000
+band_x = np.random.uniform(star_xlim[0], star_xlim[1], band_stars)
+band_y = np.random.normal(0, 0.3, band_stars)
+band_sizes = np.random.uniform(0.05, 0.8, band_stars)
+ax.scatter(band_x, band_y, s=band_sizes, c='white', alpha=0.2, marker='.')
 
 
 
@@ -92,7 +135,7 @@ for name, L in longitudes.items():
     x = cx + r * math.cos(theta)
     y = cy + r * math.sin(theta)
 
-#   Store Earth's position
+#   (Store Earth's position for Moon plotting)
     if name == "Earth":
         earth_x, earth_y = x, y
 
@@ -102,9 +145,10 @@ for name, L in longitudes.items():
     ab = AnnotationBbox(imagebox, (x, y), frameon=False)
     ax.add_artist(ab)
 
-# Earth's Moon
-#   Ring around Earth
-earth_ring_r = r_base / 10
+#   Earth's Moon
+#       Moon ring
+moon_ring_size = 250 # To keep Moon ring consistent across DPIs
+earth_ring_r = (r_base / 10) * (dpi / moon_ring_size)
 ax.add_patch(
     plt.Circle(
         (earth_x, earth_y),
@@ -114,7 +158,7 @@ ax.add_patch(
         color='white',
         linestyle=(0, (4, 4))))
 
-# Get Moon's position relative to Earth
+#       Moon's position relative to Earth
 moon_vec = GeoVector(Body.Moon, utc, True)
 moon_angle = math.degrees(math.atan2(moon_vec.y, moon_vec.x))
 moon_theta_deg = 0 - moon_angle
@@ -122,18 +166,28 @@ moon_theta = math.radians(-moon_theta_deg)
 moon_x = earth_x + earth_ring_r * math.cos(moon_theta)
 moon_y = earth_y + earth_ring_r * math.sin(moon_theta)
 
-# Plot Moon icon
+#       Plot Moon icon
 moon_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.08)
 moon_ab = AnnotationBbox(moon_imagebox, (moon_x, moon_y), frameon=False)
 ax.add_artist(moon_ab)
 
 
 
-
-# Canvas limits and aspect
+# Canvas setup
+#   Limits and aspect
 ax.set_aspect('equal', 'box')
-ax.set_xlim(-1.3, 1.3)
-ax.set_ylim(-1.3, 1.3)
+
+#   Calculate axis limits
+fig_width, fig_height = fig.get_size_inches()
+aspect = fig_width / fig_height
+
+if aspect > 1:  # Wider than tall
+    ax.set_xlim(-1.3 * aspect, 1.3 * aspect)
+    ax.set_ylim(-1.3, 1.3)
+else:  # Taller than wide
+    ax.set_xlim(-1.3, 1.3)
+    ax.set_ylim(-1.3 / aspect, 1.3 / aspect)
+
 ax.axis('off')
 
 
@@ -141,6 +195,5 @@ ax.axis('off')
 
 # Save and show
 plt.tight_layout()
-fig.set_size_inches(1920/200, 1080/200)  # 300 dpi base
-fig.savefig("solarmap.png", dpi=200)
+fig.savefig("solarmap.png", dpi=dpi)
 plt.show()
