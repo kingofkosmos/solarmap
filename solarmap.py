@@ -26,6 +26,22 @@ import numpy as np
 
 
 
+# Color toggle
+use_colors = True # Set to False for black & white
+
+# Planet colors (approximate realistic colors)
+planet_colors = {
+    'Mercury': '#815313',
+    'Venus': '#3CB371',
+    'Earth': '#4A90E2',
+    'Mars': '#CD5C5C',
+    'Jupiter': '#C88B3A',
+    'Saturn': '#FAD5A5',
+    'Uranus': '#4FD0E0',
+    'Neptune': '#4166F5'
+}
+
+
 # Planet list
 planets = [Body.Mercury, Body.Venus, Body.Earth, Body.Mars,
     Body.Jupiter, Body.Saturn, Body.Uranus, Body.Neptune]
@@ -34,10 +50,20 @@ planets = [Body.Mercury, Body.Venus, Body.Earth, Body.Mars,
 
 
 # Convert planet SVG icons to OffsetImages
-def svg_to_imagebox(svg_path, zoom=0.1):
+def svg_to_imagebox(svg_path, zoom=0.1, color=None):
     """Convert an SVG to a Matplotlib OffsetImage (PNG in memory)."""
     png_bytes = cairosvg.svg2png(url=svg_path)
     image = mpimg.imread(io.BytesIO(png_bytes), format='png')
+
+    # Colorize if color is provided
+    if color is not None:
+        from matplotlib.colors import hex2color
+        rgb = hex2color(color)
+        # Apply color to white pixels (assuming SVGs are white)
+        mask = image[:, :, :3].mean(axis=2) > 0.5  # Find white-ish pixels
+        for i in range(3):
+            image[:, :, i] = np.where(mask, rgb[i], image[:, :, i])
+
     return OffsetImage(image, zoom=zoom)
 
 
@@ -141,7 +167,8 @@ for name, L in longitudes.items():
 
 #   Plot planet icons
     svg_path = f"icons/{name.lower()}.svg"
-    imagebox = svg_to_imagebox(svg_path, zoom=0.2)
+    color = planet_colors.get(name) if use_colors else None
+    imagebox = svg_to_imagebox(svg_path, zoom=0.2, color=color)
     ab = AnnotationBbox(imagebox, (x, y), frameon=False)
     ax.add_artist(ab)
 
@@ -194,14 +221,12 @@ jupiter_L = longitudes['Jupiter'] % 360.0
 # L4 (60° ahead) and L5 (60° behind)
 for offset in [60, -60]:
     trojan_angle_deg = (jupiter_L + offset) % 360.0
-    
+
     # Generate cluster in polar coordinates
     num_trojans = 600
-    # Radial spread (toward/away from Sun)
-    radial_offsets = np.random.normal(0, 0.03, num_trojans)
-    # Angular spread (along the orbit)
-    angular_offsets = np.random.normal(0, 10, num_trojans)  # degrees
-    
+    radial_offsets = np.random.normal(0, 0.03, num_trojans) # Radial spread
+    angular_offsets = np.random.normal(0, 10, num_trojans)  # Angular spread
+
     # Convert to Cartesian
     trojan_angles = trojan_angle_deg + angular_offsets
     trojan_radii = jupiter_r + radial_offsets
@@ -209,7 +234,7 @@ for offset in [60, -60]:
     trojan_x = cx + trojan_radii * np.cos(trojan_thetas)
     trojan_y = cy + trojan_radii * np.sin(trojan_thetas)
     trojan_sizes = np.random.uniform(0.05, 0.2, num_trojans)
-    
+
     ax.scatter(trojan_x, trojan_y, s=trojan_sizes, c='white', alpha=0.4, marker='.')
 
 
