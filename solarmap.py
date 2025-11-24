@@ -9,8 +9,7 @@ import numpy as np
 
 
 #Feature additions
-#TODO: Asteroid belt rotation
-#TODO: Trojan asteroid cluters (both sides of Jupiter) + rotation
+#TODO: Asteroid & Kuiper belt rotation
 #TODO: Dwarf planets? (Pluto, Ceres, Haumea, Makemake, Eris)
 #TODO: Moons? (Galilean moons, Titan, Mars moons)
 #TODO: Comets? (Halley, Hale-Bopp)
@@ -187,6 +186,31 @@ kuiper_alphas *= 0.3
 #   Single scatter call with alpha array
 ax.scatter(kuiper_x, kuiper_y, s=kuiper_sizes, c='white', 
            alpha=kuiper_alphas, marker='.')
+
+# Jupiter Trojans at L4 and L5 Lagrange points
+jupiter_r = planet_radii['Jupiter']
+jupiter_L = longitudes['Jupiter'] % 360.0
+
+# L4 (60° ahead) and L5 (60° behind)
+for offset in [60, -60]:
+    trojan_angle_deg = (jupiter_L + offset) % 360.0
+    
+    # Generate cluster in polar coordinates
+    num_trojans = 600
+    # Radial spread (toward/away from Sun)
+    radial_offsets = np.random.normal(0, 0.03, num_trojans)
+    # Angular spread (along the orbit)
+    angular_offsets = np.random.normal(0, 10, num_trojans)  # degrees
+    
+    # Convert to Cartesian
+    trojan_angles = trojan_angle_deg + angular_offsets
+    trojan_radii = jupiter_r + radial_offsets
+    trojan_thetas = np.radians(-(0 - trojan_angles))
+    trojan_x = cx + trojan_radii * np.cos(trojan_thetas)
+    trojan_y = cy + trojan_radii * np.sin(trojan_thetas)
+    trojan_sizes = np.random.uniform(0.05, 0.2, num_trojans)
+    
+    ax.scatter(trojan_x, trojan_y, s=trojan_sizes, c='white', alpha=0.4, marker='.')
 
 
 
