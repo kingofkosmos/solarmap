@@ -7,14 +7,15 @@ import io
 import cairosvg
 import numpy as np
 
-#Feature improvements
-#TODO: Dwarf planets (Pluto, Ceres, Haumea, Makemake, Eris)
-#TODO: Asteroid belt SVG icon (one or multiple clusters?)
-#TODO: Asteroid belt rotation (one or multiple?))
-#TODO: Moons (Galilean moons, Titan, Mars moons)
-#TODO: Comets (Halley, Hale-Bopp)
 
-#Visual improvements
+#Feature additions
+#TODO: Asteroid belt rotation
+#TODO: Trojan asteroid cluters (both sides of Jupiter) + rotation
+#TODO: Dwarf planets? (Pluto, Ceres, Haumea, Makemake, Eris)
+#TODO: Moons? (Galilean moons, Titan, Mars moons)
+#TODO: Comets? (Halley, Hale-Bopp)
+
+#Visual customizations
 #TODO: Optional labels for planets
 #TODO: Optional background stars
 #TODO: Optional colors to planets, b&w or colored
@@ -145,8 +146,53 @@ for name, L in longitudes.items():
     ab = AnnotationBbox(imagebox, (x, y), frameon=False)
     ax.add_artist(ab)
 
-#   Earth's Moon
-#       Moon ring
+
+
+
+# Asteroids
+#   Asteroid belt between Mars and Jupiter
+mars_r = planet_radii['Mars']
+jupiter_r = planet_radii['Jupiter']
+asteroid_belt_inner = mars_r + (jupiter_r - mars_r) * 0.2
+asteroid_belt_outer = mars_r + (jupiter_r - mars_r) * 0.8
+
+#   Generate asteroids
+np.random.seed(123)
+num_asteroids = 2000
+asteroid_angles = np.random.uniform(0, 2 * np.pi, num_asteroids)
+asteroid_radii = np.random.uniform(asteroid_belt_inner, asteroid_belt_outer, num_asteroids)
+asteroid_x = cx + asteroid_radii * np.cos(asteroid_angles)
+asteroid_y = cy + asteroid_radii * np.sin(asteroid_angles)
+asteroid_sizes = np.random.uniform(0.05, 0.3, num_asteroids)
+
+ax.scatter(asteroid_x, asteroid_y, s=asteroid_sizes, c='white', alpha=0.4, marker='.')
+
+#   Kuiper belt beyond Neptune
+neptune_r = planet_radii['Neptune']
+kuiper_inner = neptune_r * 1.05
+kuiper_outer = neptune_r * 1.5
+
+#   Generate Kuiper belt objects
+num_kuiper = 10000
+kuiper_angles = np.random.uniform(0, 2 * np.pi, num_kuiper)
+kuiper_radii = np.random.uniform(kuiper_inner, kuiper_outer, num_kuiper)
+kuiper_x = cx + kuiper_radii * np.cos(kuiper_angles)
+kuiper_y = cy + kuiper_radii * np.sin(kuiper_angles)
+kuiper_sizes = np.random.uniform(0.03, 0.25, num_kuiper)
+
+#   Fade alpha based on distance
+kuiper_alphas = 1.0 - (kuiper_radii - kuiper_inner) / (kuiper_outer - kuiper_inner)
+kuiper_alphas *= 0.3
+
+#   Single scatter call with alpha array
+ax.scatter(kuiper_x, kuiper_y, s=kuiper_sizes, c='white', 
+           alpha=kuiper_alphas, marker='.')
+
+
+
+
+# Earth's Moon
+#     Moon ring
 moon_ring_size = 250 # To keep Moon ring consistent across DPIs
 earth_ring_r = (r_base / 10) * (dpi / moon_ring_size)
 ax.add_patch(
@@ -158,7 +204,7 @@ ax.add_patch(
         color='white',
         linestyle=(0, (4, 4))))
 
-#       Moon's position relative to Earth
+#     Moon's position relative to Earth
 moon_vec = GeoVector(Body.Moon, utc, True)
 moon_angle = math.degrees(math.atan2(moon_vec.y, moon_vec.x))
 moon_theta_deg = 0 - moon_angle
@@ -166,10 +212,11 @@ moon_theta = math.radians(-moon_theta_deg)
 moon_x = earth_x + earth_ring_r * math.cos(moon_theta)
 moon_y = earth_y + earth_ring_r * math.sin(moon_theta)
 
-#       Plot Moon icon
+#     Plot Moon icon
 moon_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.08)
 moon_ab = AnnotationBbox(moon_imagebox, (moon_x, moon_y), frameon=False)
 ax.add_artist(moon_ab)
+
 
 
 
