@@ -15,9 +15,8 @@ import numpy as np
 #TODO: Comets? (Halley, Hale-Bopp)
 
 #Visual customizations
-#TODO: Optional labels for planets
+#TODO: Planet labels working with different DPIs
 #TODO: Optional background stars
-#TODO: Optional colors to planets, b&w or colored
 #TODO: Optional colors to rings
 #TODO: Optional colors to background
 #TODO: Optional rings fading with distance/time
@@ -25,6 +24,12 @@ import numpy as np
 
 
 
+
+# Planet names toggle
+show_planet_names = True  # Set to False to hide names
+
+# Planet name offsets (single value, y will be negative of x)
+planet_name_offsets = {'Mercury': 0.02, 'Venus': 0.03, 'Earth': 0.03, 'Mars': 0.025, 'Jupiter': 0.08, 'Saturn': 0.06, 'Uranus': 0.04, 'Neptune': 0.04}
 
 # Color toggle
 use_colors = True # Set to False for black & white
@@ -172,7 +177,13 @@ for name, L in longitudes.items():
     ab = AnnotationBbox(imagebox, (x, y), frameon=False)
     ax.add_artist(ab)
 
-
+    # Add planet name
+    if show_planet_names:
+        offset = planet_name_offsets.get(name, 0.05)
+        ax.text(x + offset, y - offset, name.lower(), 
+                color='white', fontsize=8, 
+                ha='left', va='top',
+                alpha=0.7)
 
 
 # Asteroids
