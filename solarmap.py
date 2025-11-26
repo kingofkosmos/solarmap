@@ -9,7 +9,7 @@ import numpy as np
 
 
 #Feature additions
-#TODO: Asteroid & Kuiper belt rotation
+#TODO: Kuiper belt rotation
 #TODO: Dwarf planets? (Pluto, Ceres, Haumea, Makemake, Eris)
 #TODO: Moons? (Galilean moons, Titan, Mars moons)
 #TODO: Comets? (Halley, Hale-Bopp)
@@ -40,8 +40,9 @@ planet_name_offsets = {'Mercury': 0.02, 'Venus': 0.03, 'Earth': 0.03, 'Mars': 0.
 # Color toggle
 use_colors = True # Set to False for black & white
 
-# Planet colors (approximate realistic colors)
+# Planet colors
 planet_colors = {
+    'Sun':      '#FFD700',
     'Mercury':  '#815313',
     'Venus':    '#3CB371',
     'Earth':    '#4A90E2',
@@ -86,6 +87,7 @@ if custom_date:
     utc = Time.Make(year, month, day, 0, 0, 0)
 else:
     utc = Time.Now()
+
 # Calculate longitudes (angles from the Sun)
 longitudes = {planet.name: EclipticLongitude(planet, utc) for planet in planets}
 
@@ -164,7 +166,8 @@ planet_radii = {p.name: rings[i] for i, p in enumerate(planets)}
 
 # Plot objects
 #   Sun
-sun_imagebox = svg_to_imagebox("icons/sun.svg", zoom=0.3)
+sun_color = planet_colors['Sun'] if use_colors else None
+sun_imagebox = svg_to_imagebox("icons/sun.svg", zoom=0.3, color=sun_color)
 sun_ab = AnnotationBbox(sun_imagebox, (cx, cy), frameon=False)
 ax.add_artist(sun_ab)
 
