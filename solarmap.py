@@ -19,14 +19,20 @@ import numpy as np
 #TODO: Optional background stars
 #TODO: Optional colors to rings
 #TODO: Optional colors to background
-#TODO: Optional rings fading with distance/time
-#TODO: Custom time input
+#TODO: Trailing orbits optimization with wedges
 
 
 
+
+# Custom time input
+custom_date = None  # Format: "YYYY-MM-DD", set to None for current time
+
+# Orbital trails toggle
+show_trails = True
+trail_days = 150  # How many days to show in the past
 
 # Planet names toggle
-show_planet_names = True  # Set to False to hide names
+show_planet_names = False  # Set to False to hide names
 
 # Planet name offsets (single value, y will be negative of x)
 planet_name_offsets = {'Mercury': 0.02, 'Venus': 0.03, 'Earth': 0.03, 'Mars': 0.025, 'Jupiter': 0.08, 'Saturn': 0.06, 'Uranus': 0.04, 'Neptune': 0.04}
@@ -36,14 +42,14 @@ use_colors = True # Set to False for black & white
 
 # Planet colors (approximate realistic colors)
 planet_colors = {
-    'Mercury': '#815313',
-    'Venus': '#3CB371',
-    'Earth': '#4A90E2',
-    'Mars': '#CD5C5C',
-    'Jupiter': '#C88B3A',
-    'Saturn': '#FAD5A5',
-    'Uranus': '#4FD0E0',
-    'Neptune': '#4166F5'
+    'Mercury':  '#815313',
+    'Venus':    '#3CB371',
+    'Earth':    '#4A90E2',
+    'Mars':     '#CD5C5C',
+    'Jupiter':  '#C88B3A',
+    'Saturn':   '#FAD5A5',
+    'Uranus':   '#4FD0E0',
+    'Neptune':  '#4166F5'
 }
 
 
@@ -74,8 +80,13 @@ def svg_to_imagebox(svg_path, zoom=0.1, color=None):
 
 
 
-# Get current time and calculate ecliptic longitudes (angles from the Sun)
-utc = Time.Now().AddDays(0) # AddDays for testing
+# Get current time
+if custom_date:
+    year, month, day = map(int, custom_date.split('-'))
+    utc = Time.Make(year, month, day, 0, 0, 0)
+else:
+    utc = Time.Now()
+# Calculate longitudes (angles from the Sun)
 longitudes = {planet.name: EclipticLongitude(planet, utc) for planet in planets}
 
 
@@ -198,8 +209,21 @@ np.random.seed(123)
 num_asteroids = 2000
 asteroid_angles = np.random.uniform(0, 2 * np.pi, num_asteroids)
 asteroid_radii = np.random.uniform(asteroid_belt_inner, asteroid_belt_outer, num_asteroids)
-asteroid_x = cx + asteroid_radii * np.cos(asteroid_angles)
-asteroid_y = cy + asteroid_radii * np.sin(asteroid_angles)
+
+mars_L = longitudes['Mars'] % 360.0
+jup_L  = longitudes['Jupiter'] % 360.0
+
+belt_L = mars_L + 0.5 * ((jup_L - mars_L) % 360.0)
+
+
+rotation = math.radians(belt_L)   # same direction as planets
+
+rotated_angles = asteroid_angles + rotation
+
+asteroid_x = cx + asteroid_radii * np.cos(rotated_angles)
+asteroid_y = cy + asteroid_radii * np.sin(rotated_angles)
+
+
 asteroid_sizes = np.random.uniform(0.05, 0.3, num_asteroids)
 
 ax.scatter(asteroid_x, asteroid_y, s=asteroid_sizes, c='white', alpha=0.4, marker='.')
@@ -276,6 +300,65 @@ moon_y = earth_y + earth_ring_r * math.sin(moon_theta)
 moon_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.08)
 moon_ab = AnnotationBbox(moon_imagebox, (moon_x, moon_y), frameon=False)
 ax.add_artist(moon_ab)
+
+
+
+
+# Orbital trails
+if show_trails:
+    for planet in planets:
+        name = planet.name
+        r = planet_radii.get(name, 1.0)
+        
+        # Calculate past positions
+        trail_positions_x = []
+        trail_positions_y = []
+        
+        for day_offset in range(0, trail_days + 1, 2):  # Every 2 days for performance
+            past_time = utc.AddDays(-day_offset)
+            past_L = EclipticLongitude(planet, past_time) % 360.0
+            past_theta_deg = 0 - past_L
+            past_theta = math.radians(-past_theta_deg)
+            past_x = cx + r * math.cos(past_theta)
+            past_y = cy + r * math.sin(past_theta)
+            trail_positions_x.append(past_x)
+            trail_positions_y.append(past_y)
+        
+        # Plot trail with fading alpha
+        num_points = len(trail_positions_x)
+        alphas = np.linspace(0.6, 0, num_points)  # Fade from 0.6 to 0
+        
+        for i in range(num_points - 1):
+            ax.plot([trail_positions_x[i], trail_positions_x[i+1]], 
+                   [trail_positions_y[i], trail_positions_y[i+1]], 
+                   color=planet_colors.get(name, 'white') if use_colors else 'white', alpha=alphas[i], linewidth=1.5)
+
+# Moon trail
+moon_trail_days = 15
+
+if show_trails:
+    trail_positions_x = []
+    trail_positions_y = []
+    
+    for day_offset in range(0, moon_trail_days + 1, 1):  # Every day
+        past_time = utc.AddDays(-day_offset)
+        past_moon_vec = GeoVector(Body.Moon, past_time, True)
+        past_moon_angle = math.degrees(math.atan2(past_moon_vec.y, past_moon_vec.x))
+        past_moon_theta_deg = 0 - past_moon_angle
+        past_moon_theta = math.radians(-past_moon_theta_deg)
+        past_moon_x = earth_x + earth_ring_r * math.cos(past_moon_theta)
+        past_moon_y = earth_y + earth_ring_r * math.sin(past_moon_theta)
+        trail_positions_x.append(past_moon_x)
+        trail_positions_y.append(past_moon_y)
+    
+    # Plot trail with fading alpha
+    num_points = len(trail_positions_x)
+    alphas = np.linspace(0.6, 0, num_points)
+    
+    for i in range(num_points - 1):
+        ax.plot([trail_positions_x[i], trail_positions_x[i+1]], 
+               [trail_positions_y[i], trail_positions_y[i+1]], 
+               color='white', alpha=alphas[i], linewidth=1.0)
 
 
 
