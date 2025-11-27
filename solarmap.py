@@ -9,9 +9,9 @@ import numpy as np
 
 
 #Feature additions
-#TODO: Kuiper belt rotation
+#TODO: Kuiper belt rotation (practically invisible)
 #TODO: Dwarf planets? (Pluto, Ceres, Haumea, Makemake, Eris)
-#TODO: Moons? (Galilean moons, Titan, Mars moons)
+#TODO: Moons? (Ganymede, Callisto, Io, Europa, Titan, Phobos, Deimos)
 #TODO: Comets? (Halley, Hale-Bopp)
 
 #Visual customizations

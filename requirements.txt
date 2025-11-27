@@ -1,0 +1,4 @@
+astronomy-engine
+matplotlib
+cairosvg
+numpy
