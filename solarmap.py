@@ -15,6 +15,9 @@ import numpy as np
 #TODO: Comets? (Halley, Hale-Bopp)
 
 #Visual customizations
+#TODO: Asteroid belt fade out towards edges
+#TODO: Match DPI for different resolutions
+#TODO: 41 px offset from bottom (and top?)
 #TODO: Planet labels working with different DPIs
 #TODO: Optional background stars
 #TODO: Optional colors to rings
@@ -98,14 +101,24 @@ longitudes = {planet.name: EclipticLongitude(planet, utc) for planet in planets}
 #   Set wallpaper resolution
 width_px = 2560
 height_px = 1440
-dpi = 200 # Set planet size by changing dpi
+
+reference_height = 1440
+reference_dpi = 200
+dpi = int(height_px * (reference_dpi / reference_height))
 
 fig, ax = plt.subplots(figsize=(1, 1))
 fig.set_size_inches(width_px/dpi, height_px/dpi)
 fig.patch.set_facecolor('black')
 ax.set_facecolor('black')
 cx, cy = 0.0, 0.0
-r_base = 1.0
+r_base = 0.95
+
+# Taskbar offset upwards percentage, so image is not behind taskbar
+taskbar_offset = 0.025
+
+# Shift center up by 5% of y-axis range
+cy_offset = taskbar_offset * 2.6  # 2.6 is your y-axis range (from -1.3 to 1.3)
+cy = cy + cy_offset
 
 
 
