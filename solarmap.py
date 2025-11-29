@@ -459,21 +459,41 @@ illumination = illum.phase_fraction
 
 # Determine phase name
 if phase_angle < 22.5 or phase_angle >= 337.5:
-    phase_name = "Uusikuu" #new moon
+    phase_name = "Uusikuu" # New moon
 elif phase_angle < 67.5:
-    phase_name = "Kasvava sirppi" #waxing crescent
+    phase_name = "Kasvava sirppi" # Waxing crescent
 elif phase_angle < 112.5:
-    phase_name = "Ensimmäinen neljännes" #first quarter
+    phase_name = "Ensimmäinen neljännes" # First quarter
 elif phase_angle < 157.5:
-    phase_name = "Kasvava kupera kuu" #waxing gibbous
+    phase_name = "Kasvava kupera kuu" # Waxing gibbous
 elif phase_angle < 202.5:
-    phase_name = "Täysikuu" #full moon
+    phase_name = "Täysikuu" # Full moon
 elif phase_angle < 247.5:
-    phase_name = "Vähenevä kupera kuu" #waning gibbous
+    phase_name = "Vähenevä kupera kuu" # Waning gibbous
 elif phase_angle < 292.5:
-    phase_name = "Viimeinen neljännes" #last quarter
+    phase_name = "Viimeinen neljännes" # Last quarter
 else:
-    phase_name = "Vähenevä sirppi" #waning crescent
+    phase_name = "Vähenevä sirppi" # Waning crescent
+
+
+
+
+
+
+# Calculate text position (bottom right with taskbar offset)
+fig_width, fig_height = fig.get_size_inches()
+aspect = fig_width / fig_height
+
+if aspect > 1:
+    text_x = 1.3 * aspect - 0.05
+    text_y = -1.3 + (taskbar_offset * 2.6) + 0.1
+else:
+    text_x = 1.3 - 0.05
+    text_y = (-1.3 / aspect) + (taskbar_offset * 2.6) + 0.1
+
+
+
+
 
 # Position for moon phase circle
 moon_indicator_x = text_x - 0.05
@@ -533,16 +553,6 @@ days_to_full = next_full_moon.ut - utc.ut  # Difference in days
 
 
 
-# Calculate text position (bottom right with taskbar offset)
-fig_width, fig_height = fig.get_size_inches()
-aspect = fig_width / fig_height
-
-if aspect > 1:
-    text_x = 1.3 * aspect - 0.05
-    text_y = -1.3 + (taskbar_offset * 2.6) + 0.1
-else:
-    text_x = 1.3 - 0.05
-    text_y = (-1.3 / aspect) + (taskbar_offset * 2.6) + 0.1
 
 # Add text
 info_text = f"{phase_name}\n{days_to_full:.0f} päivää seuraavaan täysikuuhun\n☀ {sunrise_time}  🌙 {sunset_time}\nPäivänvalo: {daylight_hours} h {daylight_mins} min"
