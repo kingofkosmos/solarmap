@@ -90,7 +90,7 @@ if custom_date:
     year, month, day = map(int, custom_date.split('-'))
     utc = Time.Make(year, month, day, 0, 0, 0)
 else:
-    utc = Time.Now()
+    utc = Time.Now().AddDays(0) # AddDays for testing
 
 # Calculate longitudes (angles from the Sun)
 longitudes = {planet.name: EclipticLongitude(planet, utc) for planet in planets}
@@ -111,7 +111,7 @@ fig, ax = plt.subplots(figsize=(1, 1))
 fig.set_size_inches(width_px/dpi, height_px/dpi)
 fig.patch.set_facecolor('black')
 ax.set_facecolor('black')
-cx, cy = 0.0, 0.0
+cx, cy = 0, 0
 r_base = 0.85  # Ring radius base unit, change for bigger rings
 
 # Taskbar offset upwards percentage, change to move image upwards
@@ -170,7 +170,14 @@ for _ in range(5, 8): # Rings 6 to 8
     current += step
     rings.append(current)
 for r in rings: # Draw rings, dashed lines
-    ax.add_patch(plt.Circle((cx, cy), r, fill=False, lw=0.4, color='white', linestyle=(0, (10, 10))))
+    ax.add_patch(
+        plt.Circle(
+            (cx, cy),
+            r,
+            fill=False,
+            linewidth=0.4,
+            color='white',
+            linestyle=(0, (10, 10))))
 
 #   Radii for each planet
 planet_radii = {p.name: rings[i] for i, p in enumerate(planets)}
@@ -187,10 +194,10 @@ ax.add_artist(sun_ab)
 
 #   Planets
 for name, L in longitudes.items():
-    L = L % 360.0
+    L = L % 360
     theta_deg = 0 - L
     theta = math.radians(-theta_deg)
-    r = planet_radii.get(name, 1.0)
+    r = planet_radii.get(name, 1)
     x = cx + r * math.cos(theta)
     y = cy + r * math.sin(theta)
 
@@ -229,26 +236,21 @@ num_asteroids = 6000
 asteroid_angles = np.random.uniform(0, 2 * np.pi, num_asteroids)
 asteroid_radii = np.random.uniform(asteroid_belt_inner, asteroid_belt_outer, num_asteroids)
 
-mars_L = longitudes['Mars'] % 360.0
-jup_L  = longitudes['Jupiter'] % 360.0
+# Calculate rotation as average of Mars and Jupiter
+mars_L = longitudes['Mars'] % 360
+jup_L  = longitudes['Jupiter'] % 360
+belt_L = (mars_L + jup_L) / 2
 
-belt_L = mars_L + 0.5 * ((jup_L - mars_L) % 360.0)
-
-
-rotation = math.radians(belt_L)   # same direction as planets
-
+rotation = math.radians(belt_L)
 rotated_angles = asteroid_angles + rotation
 
 asteroid_x = cx + asteroid_radii * np.cos(rotated_angles)
 asteroid_y = cy + asteroid_radii * np.sin(rotated_angles)
-
-asteroid_x = cx + asteroid_radii * np.cos(asteroid_angles)
-asteroid_y = cy + asteroid_radii * np.sin(asteroid_angles)
-asteroid_sizes = np.random.uniform(0.02, 0.15, num_asteroids)  # Smaller
+asteroid_sizes = np.random.uniform(0.02, 0.15, num_asteroids)
 
 # Fade in from inner edge (fast), fade out at outer edge (slow)
 belt_width = asteroid_belt_outer - asteroid_belt_inner
-normalized_pos = (asteroid_radii - asteroid_belt_inner) / belt_width  # 0 to 1
+normalized_pos = (asteroid_radii - asteroid_belt_inner) / belt_width
 
 # Fast fade in, slow fade out
 asteroid_alphas = np.ones(num_asteroids) * 0.4
@@ -259,7 +261,6 @@ asteroid_alphas[fade_in_mask] = (normalized_pos[fade_in_mask] / 0.2) * 0.4
 asteroid_alphas[fade_out_mask] = (1 - (normalized_pos[fade_out_mask] - 0.6) / 0.4) * 0.4
 
 ax.scatter(asteroid_x, asteroid_y, s=asteroid_sizes, c='white', alpha=asteroid_alphas, marker='.')
-
 
 
 
@@ -277,7 +278,7 @@ kuiper_y = cy + kuiper_radii * np.sin(kuiper_angles)
 kuiper_sizes = np.random.uniform(0.03, 0.25, num_kuiper)
 
 #   Fade alpha based on distance
-kuiper_alphas = 1.0 - (kuiper_radii - kuiper_inner) / (kuiper_outer - kuiper_inner)
+kuiper_alphas = 1 - (kuiper_radii - kuiper_inner) / (kuiper_outer - kuiper_inner)
 kuiper_alphas *= 0.3
 
 #   Single scatter call with alpha array
@@ -286,11 +287,11 @@ ax.scatter(kuiper_x, kuiper_y, s=kuiper_sizes, c='white',
 
 # Jupiter Trojans at L4 and L5 Lagrange points
 jupiter_r = planet_radii['Jupiter']
-jupiter_L = longitudes['Jupiter'] % 360.0
+jupiter_L = longitudes['Jupiter'] % 360
 
 # L4 (60° ahead) and L5 (60° behind)
 for offset in [60, -60]:
-    trojan_angle_deg = (jupiter_L + offset) % 360.0
+    trojan_angle_deg = (jupiter_L + offset) % 360
 
     # Generate cluster in polar coordinates
     num_trojans = 600
@@ -319,7 +320,7 @@ ax.add_patch(
         (earth_x, earth_y),
         earth_ring_r,
         fill=False,
-        lw=0.4,
+        linewidth=0.4,
         color='white',
         linestyle=(0, (4, 4))))
 
@@ -343,7 +344,7 @@ ax.add_artist(moon_ab)
 if show_trails:
     for planet in planets:
         name = planet.name
-        r = planet_radii.get(name, 1.0)
+        r = planet_radii.get(name, 1)
         
         # Calculate past positions
         trail_positions_x = []
@@ -351,7 +352,7 @@ if show_trails:
         
         for day_offset in range(0, trail_days + 1, 2):  # Every 2 days for performance
             past_time = utc.AddDays(-day_offset)
-            past_L = EclipticLongitude(planet, past_time) % 360.0
+            past_L = EclipticLongitude(planet, past_time) % 360
             past_theta_deg = 0 - past_L
             past_theta = math.radians(-past_theta_deg)
             past_x = cx + r * math.cos(past_theta)
