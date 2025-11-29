@@ -16,7 +16,6 @@ from matplotlib import font_manager
 
 #Visual customizations
 #TODO: Fix stars cutoff from top and bottom
-#TODO: Kuiper belt rotation (practically invisible)
 #TODO: Trojans more teardrop shaped
 #TODO: Add asteroid belt rotation back
 #TODO: Planet labels working with different DPIs
@@ -291,28 +290,62 @@ kuiper_alphas *= 0.3
 ax.scatter(kuiper_x, kuiper_y, s=kuiper_sizes, c='white', 
            alpha=kuiper_alphas, marker='.')
 
+
 # Jupiter Trojans at L4 and L5 Lagrange points
 jupiter_r = planet_radii['Jupiter']
-jupiter_L = longitudes['Jupiter'] % 360
+jupiter_L = longitudes['Jupiter'] % 360.0
 
-# L4 (60° ahead) and L5 (60° behind)
+# Main ball
+for offset in [45, -45]: 
+    trojan_angle_deg = (jupiter_L + offset) % 360.0
+
+    num_ball = 500
+    ball_radial = np.random.normal(0, 0.03, num_ball) # Length
+    ball_angular = np.random.normal(0, 5, num_ball)  # Width
+    
+    ball_angles = trojan_angle_deg + ball_angular
+    ball_radii = jupiter_r + ball_radial
+    ball_thetas = np.radians(-(0 - ball_angles))
+    ball_x = cx + ball_radii * np.cos(ball_thetas)
+    ball_y = cy + ball_radii * np.sin(ball_thetas)
+    ball_sizes = np.random.uniform(0.05, 0.2, num_ball)
+    
+    ax.scatter(ball_x, ball_y, s=ball_sizes, c='white', alpha=0.4, marker='.')
+
+# Inner tail
+for offset in [55, -55]: 
+    trojan_angle_deg = (jupiter_L + offset) % 360.0
+
+    num_ball = 150
+    ball_radial = np.random.normal(0, 0.02, num_ball)  # Width
+    ball_angular = np.random.normal(0, 5, num_ball)  # Length
+    
+    ball_angles = trojan_angle_deg + ball_angular
+    ball_radii = jupiter_r + ball_radial
+    ball_thetas = np.radians(-(0 - ball_angles))
+    ball_x = cx + ball_radii * np.cos(ball_thetas)
+    ball_y = cy + ball_radii * np.sin(ball_thetas)
+    ball_sizes = np.random.uniform(0.05, 0.2, num_ball)
+    
+    ax.scatter(ball_x, ball_y, s=ball_sizes, c='white', alpha=0.4, marker='.')
+
+# Outer tail
 for offset in [60, -60]:
-    trojan_angle_deg = (jupiter_L + offset) % 360
+    trojan_angle_deg = (jupiter_L + offset) % 360.0
 
-    # Generate cluster in polar coordinates
-    num_trojans = 600
-    radial_offsets = np.random.normal(0, 0.03, num_trojans) # Radial spread
-    angular_offsets = np.random.normal(0, 10, num_trojans)  # Angular spread
+    # TAIL extending outward from the ball (away from Jupiter)
+    num_tail = 250
+    ball_radial = np.random.normal(0, 0.01, num_tail)  # Width
+    ball_angular = np.random.normal(0, 10, num_tail)  # Length
 
-    # Convert to Cartesian
-    trojan_angles = trojan_angle_deg + angular_offsets
-    trojan_radii = jupiter_r + radial_offsets
-    trojan_thetas = np.radians(-(0 - trojan_angles))
-    trojan_x = cx + trojan_radii * np.cos(trojan_thetas)
-    trojan_y = cy + trojan_radii * np.sin(trojan_thetas)
-    trojan_sizes = np.random.uniform(0.05, 0.2, num_trojans)
-
-    ax.scatter(trojan_x, trojan_y, s=trojan_sizes, c='white', alpha=0.4, marker='.')
+    ball_angles = trojan_angle_deg + ball_angular
+    ball_radii = jupiter_r + ball_radial
+    ball_thetas = np.radians(-(0 - ball_angles))
+    ball_x = cx + ball_radii * np.cos(ball_thetas)
+    ball_y = cy + ball_radii * np.sin(ball_thetas)
+    ball_sizes = np.random.uniform(0.05, 0.2, num_tail)
+    
+    ax.scatter(ball_x, ball_y, s=ball_sizes, c='white', alpha=0.4, marker='.')
 
 
 
@@ -470,7 +503,7 @@ if phase_angle < 22.5 or phase_angle >= 337.5:
 elif phase_angle < 67.5:
     phase_name = "Kasvava sirppi" # Waxing crescent
 elif phase_angle < 112.5:
-    phase_name = "Ensimmäinen neljännes" # First quarter
+    phase_name = "Kuun ensimmäinen neljännes" # First quarter
 elif phase_angle < 157.5:
     phase_name = "Kasvava kupera kuu" # Waxing gibbous
 elif phase_angle < 202.5:
@@ -478,7 +511,7 @@ elif phase_angle < 202.5:
 elif phase_angle < 247.5:
     phase_name = "Vähenevä kupera kuu" # Waning gibbous
 elif phase_angle < 292.5:
-    phase_name = "Viimeinen neljännes" # Last quarter
+    phase_name = "Kuun viimeinen neljännes" # Last quarter
 else:
     phase_name = "Vähenevä sirppi" # Waning crescent
 
@@ -562,7 +595,7 @@ days_to_full = next_full_moon.ut - utc.ut  # Difference in days
 
 
 # Add text
-info_text = f"{phase_name}\n{days_to_full:.0f} päivää seuraavaan täysikuuhun\n☀ {sunrise_time}  🌙 {sunset_time}\nPäivänvalo: {daylight_hours} h {daylight_mins} min"
+info_text = f"{phase_name}\n{days_to_full:.0f} päivää seuraavaan täysikuuhun\nPäivänvalo: {daylight_hours} h {daylight_mins} min\n☀ {sunrise_time}  🌙 {sunset_time}"
 ax.text(text_x, text_y, info_text,
         color='white', fontsize=10,
         ha='right', va='bottom',
