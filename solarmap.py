@@ -273,12 +273,18 @@ kuiper_outer = neptune_r * 1.5
 num_kuiper = 10000
 kuiper_angles = np.random.uniform(0, 2 * np.pi, num_kuiper)
 kuiper_radii = np.random.uniform(kuiper_inner, kuiper_outer, num_kuiper)
-kuiper_x = cx + kuiper_radii * np.cos(kuiper_angles)
-kuiper_y = cy + kuiper_radii * np.sin(kuiper_angles)
+
+# Rotate slightly slower than Neptune (95% of Neptune's rotation)
+neptune_L = longitudes['Neptune'] % 360.0
+kuiper_rotation = math.radians(neptune_L * 0.95)
+rotated_kuiper_angles = kuiper_angles + kuiper_rotation
+
+kuiper_x = cx + kuiper_radii * np.cos(rotated_kuiper_angles)
+kuiper_y = cy + kuiper_radii * np.sin(rotated_kuiper_angles)
 kuiper_sizes = np.random.uniform(0.03, 0.25, num_kuiper)
 
 #   Fade alpha based on distance
-kuiper_alphas = 1 - (kuiper_radii - kuiper_inner) / (kuiper_outer - kuiper_inner)
+kuiper_alphas = 1.0 - (kuiper_radii - kuiper_inner) / (kuiper_outer - kuiper_inner)
 kuiper_alphas *= 0.3
 
 #   Single scatter call with alpha array
