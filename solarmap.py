@@ -1,4 +1,4 @@
-from astronomy import Time, Body, EclipticLongitude, GeoVector, Observer, SearchRiseSet, Direction, Illumination
+from astronomy import Time, Body, EclipticLongitude, GeoVector, Observer, SearchRiseSet, Direction, Illumination, SearchMoonPhase
 import math
 import matplotlib.pyplot as plt
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
@@ -16,8 +16,6 @@ from matplotlib import font_manager
 
 #Visual customizations
 #TODO: Fix stars cutoff from top and bottom
-#TODO: Bottom right corner info:
-#       days to next full moon
 #TODO: Kuiper belt rotation (practically invisible)
 #TODO: Trojans more teardrop shaped
 #TODO: Add asteroid belt rotation back
@@ -106,7 +104,7 @@ width_px = 2560
 height_px = 1440
 
 reference_height = 1440
-reference_dpi = 200
+reference_dpi = 150 # Reference DPI for scaling, change for bigger/smaller planets and stars
 dpi = int(height_px * (reference_dpi / reference_height))
 
 fig, ax = plt.subplots(figsize=(1, 1))
@@ -114,10 +112,10 @@ fig.set_size_inches(width_px/dpi, height_px/dpi)
 fig.patch.set_facecolor('black')
 ax.set_facecolor('black')
 cx, cy = 0.0, 0.0
-r_base = 0.95
+r_base = 0.85  # Ring radius base unit, change for bigger rings
 
-# Taskbar offset upwards percentage, so image is not behind taskbar
-taskbar_offset = 0.025
+# Taskbar offset upwards percentage, change to move image upwards
+taskbar_offset = 0.02
 
 # Shift center up by 5% of y-axis range
 cy_offset = taskbar_offset * 2.6  # 2.6 is your y-axis range (from -1.3 to 1.3)
@@ -445,8 +443,8 @@ sunrise_minute = sunrise_cal[4]
 sunset_hour = (sunset_cal[3] + local_offset_hours) % 24
 sunset_minute = sunset_cal[4]
 
-sunrise_time = f"{sunrise_hour:02d}:{sunrise_minute:02d}"
-sunset_time = f"{sunset_hour:02d}:{sunset_minute:02d}"
+sunrise_time = f"{sunrise_hour}:{sunrise_minute:02d}"
+sunset_time = f"{sunset_hour}:{sunset_minute:02d}"
 
 # Calculate daylight hours
 daylight_minutes = (sunset_hour * 60 + sunset_minute) - (sunrise_hour * 60 + sunrise_minute)
@@ -461,21 +459,21 @@ illumination = illum.phase_fraction
 
 # Determine phase name
 if phase_angle < 22.5 or phase_angle >= 337.5:
-    phase_name = "New Moon"
+    phase_name = "Uusikuu" #new moon
 elif phase_angle < 67.5:
-    phase_name = "Waxing crescent"
+    phase_name = "Kasvava sirppi" #waxing crescent
 elif phase_angle < 112.5:
-    phase_name = "First quarter"
+    phase_name = "Ensimmäinen neljännes" #first quarter
 elif phase_angle < 157.5:
-    phase_name = "Waxing gibbous"
+    phase_name = "Kasvava kupera kuu" #waxing gibbous
 elif phase_angle < 202.5:
-    phase_name = "Full moon"
+    phase_name = "Täysikuu" #full moon
 elif phase_angle < 247.5:
-    phase_name = "Waning gibbous"
+    phase_name = "Vähenevä kupera kuu" #waning gibbous
 elif phase_angle < 292.5:
-    phase_name = "Last quarter"
+    phase_name = "Viimeinen neljännes" #last quarter
 else:
-    phase_name = "Waning crescent"
+    phase_name = "Vähenevä sirppi" #waning crescent
 
 # Position for moon phase circle
 moon_indicator_x = text_x - 0.05
@@ -528,6 +526,13 @@ else:  # Waning
     ax.fill(x_coords, y_coords, color='white', alpha=0.9, zorder=11)
 
 
+# Search for next full moon (phase 180°) within next 30 days
+next_full_moon = SearchMoonPhase(180, utc, 30)
+days_to_full = next_full_moon.ut - utc.ut  # Difference in days
+
+
+
+
 # Calculate text position (bottom right with taskbar offset)
 fig_width, fig_height = fig.get_size_inches()
 aspect = fig_width / fig_height
@@ -540,7 +545,7 @@ else:
     text_y = (-1.3 / aspect) + (taskbar_offset * 2.6) + 0.1
 
 # Add text
-info_text = f"{phase_name}\n☀ {sunrise_time}  🌙 {sunset_time}\nDaylight: {daylight_hours} h {daylight_mins} min"
+info_text = f"{phase_name}\n{days_to_full:.0f} päivää seuraavaan täysikuuhun\n☀ {sunrise_time}  🌙 {sunset_time}\nPäivänvalo: {daylight_hours} h {daylight_mins} min"
 ax.text(text_x, text_y, info_text,
         color='white', fontsize=10,
         ha='right', va='bottom',
