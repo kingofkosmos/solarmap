@@ -1,4 +1,4 @@
-from astronomy import Time, Body, EclipticLongitude, GeoVector
+from astronomy import Time, Body, EclipticLongitude, GeoVector, Observer, SearchRiseSet, Direction, Illumination
 import math
 import matplotlib.pyplot as plt
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
@@ -6,18 +6,21 @@ import matplotlib.image as mpimg
 import io
 import cairosvg
 import numpy as np
+from matplotlib import font_manager
 
 
-#Feature additions
-#TODO: Kuiper belt rotation (practically invisible)
+#Object additions
 #TODO: Dwarf planets? (Pluto, Ceres, Haumea, Makemake, Eris)
 #TODO: Moons? (Ganymede, Callisto, Io, Europa, Titan, Phobos, Deimos)
 #TODO: Comets? (Halley, Hale-Bopp)
 
 #Visual customizations
-#TODO: Asteroid belt fade out towards edges
-#TODO: Match DPI for different resolutions
-#TODO: 41 px offset from bottom (and top?)
+#TODO: Fix stars cutoff from top and bottom
+#TODO: Bottom right corner info:
+#       days to next full moon
+#TODO: Kuiper belt rotation (practically invisible)
+#TODO: Trojans more teardrop shaped
+#TODO: Add asteroid belt rotation back
 #TODO: Planet labels working with different DPIs
 #TODO: Optional background stars
 #TODO: Optional colors to rings
@@ -213,16 +216,18 @@ for name, L in longitudes.items():
                 alpha=0.7)
 
 
+
+
 # Asteroids
 #   Asteroid belt between Mars and Jupiter
 mars_r = planet_radii['Mars']
 jupiter_r = planet_radii['Jupiter']
-asteroid_belt_inner = mars_r + (jupiter_r - mars_r) * 0.2
-asteroid_belt_outer = mars_r + (jupiter_r - mars_r) * 0.8
+asteroid_belt_inner = mars_r + (jupiter_r - mars_r) * 0.1
+asteroid_belt_outer = mars_r + (jupiter_r - mars_r) * 0.9
 
 #   Generate asteroids
 np.random.seed(123)
-num_asteroids = 2000
+num_asteroids = 6000
 asteroid_angles = np.random.uniform(0, 2 * np.pi, num_asteroids)
 asteroid_radii = np.random.uniform(asteroid_belt_inner, asteroid_belt_outer, num_asteroids)
 
@@ -239,10 +244,26 @@ rotated_angles = asteroid_angles + rotation
 asteroid_x = cx + asteroid_radii * np.cos(rotated_angles)
 asteroid_y = cy + asteroid_radii * np.sin(rotated_angles)
 
+asteroid_x = cx + asteroid_radii * np.cos(asteroid_angles)
+asteroid_y = cy + asteroid_radii * np.sin(asteroid_angles)
+asteroid_sizes = np.random.uniform(0.02, 0.15, num_asteroids)  # Smaller
 
-asteroid_sizes = np.random.uniform(0.05, 0.3, num_asteroids)
+# Fade in from inner edge (fast), fade out at outer edge (slow)
+belt_width = asteroid_belt_outer - asteroid_belt_inner
+normalized_pos = (asteroid_radii - asteroid_belt_inner) / belt_width  # 0 to 1
 
-ax.scatter(asteroid_x, asteroid_y, s=asteroid_sizes, c='white', alpha=0.4, marker='.')
+# Fast fade in, slow fade out
+asteroid_alphas = np.ones(num_asteroids) * 0.4
+fade_in_mask = normalized_pos < 0.5
+fade_out_mask = normalized_pos > 0.5
+
+asteroid_alphas[fade_in_mask] = (normalized_pos[fade_in_mask] / 0.2) * 0.4
+asteroid_alphas[fade_out_mask] = (1 - (normalized_pos[fade_out_mask] - 0.6) / 0.4) * 0.4
+
+ax.scatter(asteroid_x, asteroid_y, s=asteroid_sizes, c='white', alpha=asteroid_alphas, marker='.')
+
+
+
 
 #   Kuiper belt beyond Neptune
 neptune_r = planet_radii['Neptune']
@@ -395,6 +416,136 @@ else:  # Taller than wide
     ax.set_ylim(-1.3 / aspect, 1.3 / aspect)
 
 ax.axis('off')
+
+
+
+
+# Bottom right corner info
+from astronomy import SearchRiseSet, Direction, Observer
+
+# Location coordinates
+latitude = 60.06977
+longitude = 23.66283
+
+# Get sunrise and sunset for today
+observer = Observer(latitude, longitude, 0)
+sunrise_time_obj = SearchRiseSet(Body.Sun, observer, Direction.Rise, utc, 1)
+sunset_time_obj = SearchRiseSet(Body.Sun, observer, Direction.Set, utc, 1)
+
+# Convert to local time (Helsinki is UTC+2 in winter, UTC+3 in summer)
+local_offset_hours = 2  # Adjust to 3 for summer time
+
+# Use Calendar() to get datetime components (returns tuple: year, month, day, hour, minute, second)
+sunrise_cal = sunrise_time_obj.Calendar()
+sunset_cal = sunset_time_obj.Calendar()
+
+sunrise_hour = (sunrise_cal[3] + local_offset_hours) % 24
+sunrise_minute = sunrise_cal[4]
+
+sunset_hour = (sunset_cal[3] + local_offset_hours) % 24
+sunset_minute = sunset_cal[4]
+
+sunrise_time = f"{sunrise_hour:02d}:{sunrise_minute:02d}"
+sunset_time = f"{sunset_hour:02d}:{sunset_minute:02d}"
+
+# Calculate daylight hours
+daylight_minutes = (sunset_hour * 60 + sunset_minute) - (sunrise_hour * 60 + sunrise_minute)
+daylight_hours = daylight_minutes // 60
+daylight_mins = daylight_minutes % 60
+
+
+# Get moon phase
+illum = Illumination(Body.Moon, utc)
+phase_angle = illum.phase_angle  # 0° = new moon, 180° = full moon
+illumination = illum.phase_fraction
+
+# Determine phase name
+if phase_angle < 22.5 or phase_angle >= 337.5:
+    phase_name = "New Moon"
+elif phase_angle < 67.5:
+    phase_name = "Waxing crescent"
+elif phase_angle < 112.5:
+    phase_name = "First quarter"
+elif phase_angle < 157.5:
+    phase_name = "Waxing gibbous"
+elif phase_angle < 202.5:
+    phase_name = "Full moon"
+elif phase_angle < 247.5:
+    phase_name = "Waning gibbous"
+elif phase_angle < 292.5:
+    phase_name = "Last quarter"
+else:
+    phase_name = "Waning crescent"
+
+# Position for moon phase circle
+moon_indicator_x = text_x - 0.05
+moon_indicator_y = text_y + 0.25
+moon_radius = 0.035
+
+# Draw dark gray base circle
+ax.add_patch(plt.Circle((moon_indicator_x, moon_indicator_y), moon_radius, 
+                        fill=True, color='#404040', alpha=0.9, zorder=10))
+
+# Draw illuminated part with proper terminator
+theta = np.linspace(0, 2*np.pi, 200)
+
+if phase_angle < 180:  # Waxing
+    # Right semicircle (always lit during waxing)
+    mask_right = np.cos(theta) >= 0
+    # Left side varies with phase
+    k = np.cos(np.radians(phase_angle))  # -1 (new) to 1 (full)
+    
+    x_coords = []
+    y_coords = []
+    for i, t in enumerate(theta):
+        cos_t = np.cos(t)
+        sin_t = np.sin(t)
+        if cos_t >= 0:  # Right side
+            x_coords.append(moon_indicator_x + moon_radius * cos_t)
+            y_coords.append(moon_indicator_y + moon_radius * sin_t)
+        else:  # Left side - ellipse
+            x_coords.append(moon_indicator_x + moon_radius * k * cos_t)
+            y_coords.append(moon_indicator_y + moon_radius * sin_t)
+    
+    ax.fill(x_coords, y_coords, color='white', alpha=0.9, zorder=11)
+    
+else:  # Waning
+    # Left semicircle (always lit during waning)
+    k = np.cos(np.radians(180 - phase_angle))  # 1 (full) to -1 (new)
+    
+    x_coords = []
+    y_coords = []
+    for i, t in enumerate(theta):
+        cos_t = np.cos(t)
+        sin_t = np.sin(t)
+        if cos_t <= 0:  # Left side
+            x_coords.append(moon_indicator_x + moon_radius * cos_t)
+            y_coords.append(moon_indicator_y + moon_radius * sin_t)
+        else:  # Right side - ellipse
+            x_coords.append(moon_indicator_x + moon_radius * k * cos_t)
+            y_coords.append(moon_indicator_y + moon_radius * sin_t)
+    
+    ax.fill(x_coords, y_coords, color='white', alpha=0.9, zorder=11)
+
+
+# Calculate text position (bottom right with taskbar offset)
+fig_width, fig_height = fig.get_size_inches()
+aspect = fig_width / fig_height
+
+if aspect > 1:
+    text_x = 1.3 * aspect - 0.05
+    text_y = -1.3 + (taskbar_offset * 2.6) + 0.1
+else:
+    text_x = 1.3 - 0.05
+    text_y = (-1.3 / aspect) + (taskbar_offset * 2.6) + 0.1
+
+# Add text
+info_text = f"{phase_name}\n☀ {sunrise_time}  🌙 {sunset_time}\nDaylight: {daylight_hours} h {daylight_mins} min"
+ax.text(text_x, text_y, info_text,
+        color='white', fontsize=10,
+        ha='right', va='bottom',
+        alpha=0.7,
+        fontproperties=font_manager.FontProperties(family='Segoe UI Emoji'))
 
 
 
