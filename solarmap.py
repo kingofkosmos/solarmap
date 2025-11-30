@@ -16,8 +16,6 @@ from matplotlib import font_manager
 
 #Visual customizations
 #TODO: Fix stars cutoff from top and bottom
-#TODO: Trojans more teardrop shaped
-#TODO: Add asteroid belt rotation back
 #TODO: Planet labels working with different DPIs
 #TODO: Optional background stars
 #TODO: Optional colors to rings
@@ -291,61 +289,36 @@ ax.scatter(kuiper_x, kuiper_y, s=kuiper_sizes, c='white',
            alpha=kuiper_alphas, marker='.')
 
 
-# Jupiter Trojans at L4 and L5 Lagrange points
-jupiter_r = planet_radii['Jupiter']
-jupiter_L = longitudes['Jupiter'] % 360.0
+def trojan_cloud(jupiter_r, jupiter_L, offset_deg, n=1200):
+    # L4 (+60°) or L5 (−60°)
+    center_angle = math.radians(-(0 - ((jupiter_L + offset_deg) % 360)))
 
-# Main ball
-for offset in [45, -45]: 
-    trojan_angle_deg = (jupiter_L + offset) % 360.0
+    # radial distribution (slightly elongated)
+    radial = np.random.normal(0, 0.03, n)
 
-    num_ball = 500
-    ball_radial = np.random.normal(0, 0.03, num_ball) # Length
-    ball_angular = np.random.normal(0, 5, num_ball)  # Width
-    
-    ball_angles = trojan_angle_deg + ball_angular
-    ball_radii = jupiter_r + ball_radial
-    ball_thetas = np.radians(-(0 - ball_angles))
-    ball_x = cx + ball_radii * np.cos(ball_thetas)
-    ball_y = cy + ball_radii * np.sin(ball_thetas)
-    ball_sizes = np.random.uniform(0.05, 0.2, num_ball)
-    
-    ax.scatter(ball_x, ball_y, s=ball_sizes, c='white', alpha=0.4, marker='.')
+    # angular distribution (teardrop shape)
+    # more particles near center, fading outward
+    angular_core = np.random.normal(0, 5, n)          # central clump
+    angular_tail = np.random.normal(15, 8, n)         # stretched tail
 
-# Inner tail
-for offset in [55, -55]: 
-    trojan_angle_deg = (jupiter_L + offset) % 360.0
+    # blend core/tail weights smoothly
+    blend = np.random.uniform(0, 1, n)
+    angular = angular_core * (1 - blend) + angular_tail * blend
 
-    num_ball = 150
-    ball_radial = np.random.normal(0, 0.02, num_ball)  # Width
-    ball_angular = np.random.normal(0, 5, num_ball)  # Length
-    
-    ball_angles = trojan_angle_deg + ball_angular
-    ball_radii = jupiter_r + ball_radial
-    ball_thetas = np.radians(-(0 - ball_angles))
-    ball_x = cx + ball_radii * np.cos(ball_thetas)
-    ball_y = cy + ball_radii * np.sin(ball_thetas)
-    ball_sizes = np.random.uniform(0.05, 0.2, num_ball)
-    
-    ax.scatter(ball_x, ball_y, s=ball_sizes, c='white', alpha=0.4, marker='.')
+    # sign: tail outward from Jupiter
+    angular *= np.sign(offset_deg)
 
-# Outer tail
-for offset in [60, -60]:
-    trojan_angle_deg = (jupiter_L + offset) % 360.0
+    theta = center_angle + np.radians(angular)
+    rr = jupiter_r + radial
 
-    # TAIL extending outward from the ball (away from Jupiter)
-    num_tail = 250
-    ball_radial = np.random.normal(0, 0.01, num_tail)  # Width
-    ball_angular = np.random.normal(0, 10, num_tail)  # Length
+    x = cx + rr * np.cos(theta)
+    y = cy + rr * np.sin(theta)
+    size = np.random.uniform(0.05, 0.2, n)
 
-    ball_angles = trojan_angle_deg + ball_angular
-    ball_radii = jupiter_r + ball_radial
-    ball_thetas = np.radians(-(0 - ball_angles))
-    ball_x = cx + ball_radii * np.cos(ball_thetas)
-    ball_y = cy + ball_radii * np.sin(ball_thetas)
-    ball_sizes = np.random.uniform(0.05, 0.2, num_tail)
-    
-    ax.scatter(ball_x, ball_y, s=ball_sizes, c='white', alpha=0.4, marker='.')
+    ax.scatter(x, y, s=size, c='white', alpha=0.35, marker='.')
+
+trojan_cloud(jupiter_r, jupiter_L, +60)   # L4
+trojan_cloud(jupiter_r, jupiter_L, -60)   # L5
 
 
 
