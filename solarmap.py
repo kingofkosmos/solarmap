@@ -99,8 +99,8 @@ longitudes = {planet.name: EclipticLongitude(planet, utc) for planet in planets}
 
 # Canvas setup
 #   Set wallpaper resolution
-width_px = 2560
-height_px = 1440
+width_px = 1920
+height_px = 1080
 
 reference_height = 1440
 reference_dpi = 150 # Reference DPI for scaling, change for bigger/smaller planets and stars
@@ -353,7 +353,7 @@ for offset in [60, -60]:
 # Earth's Moon
 #     Moon ring
 moon_ring_size = 250 # To keep Moon ring consistent across DPIs
-earth_ring_r = (r_base / 10) * (dpi / moon_ring_size)
+earth_ring_r = 0.06  # adjust visually
 ax.add_patch(
     plt.Circle(
         (earth_x, earth_y),
