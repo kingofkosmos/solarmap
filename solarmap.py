@@ -1,4 +1,4 @@
-from astronomy import Time, Body, EclipticLongitude, GeoVector, Observer, SearchRiseSet, Direction, Illumination, SearchMoonPhase
+from astronomy import Time, Body, EclipticLongitude, GeoVector, Observer, SearchRiseSet, Direction, Illumination, SearchMoonPhase, Elongation
 import math
 import matplotlib.pyplot as plt
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
@@ -15,6 +15,7 @@ from matplotlib import font_manager
 #TODO: Comets? (Halley, Hale-Bopp)
 
 #Visual customizations
+#TODO: Fix moon phase display and names
 #TODO: Fix stars cutoff from top and bottom
 #TODO: Planet labels working with different DPIs
 #TODO: Optional background stars
@@ -289,6 +290,10 @@ ax.scatter(kuiper_x, kuiper_y, s=kuiper_sizes, c='white',
            alpha=kuiper_alphas, marker='.')
 
 
+# Jupiter Trojans - get Jupiter's position
+jupiter_r = planet_radii['Jupiter']
+jupiter_L = longitudes['Jupiter'] % 360
+
 def trojan_cloud(jupiter_r, jupiter_L, offset_deg, n=1200):
     # L4 (+60°) or L5 (−60°)
     center_angle = math.radians(-(0 - ((jupiter_L + offset_deg) % 360)))
@@ -465,30 +470,40 @@ daylight_hours = daylight_minutes // 60
 daylight_mins = daylight_minutes % 60
 
 
-# Get moon phase
+
+
+# Get Moon elongation (angle from Sun)
+moon_elong_event = Elongation(Body.Moon, utc)
+moon_elongation = moon_elong_event.elongation  # Get the angle value
+
+# Elongation: 0° to 180° = waxing (Moon east of Sun)
+#            180° to 360° = waning (Moon west of Sun)
+is_waxing = 0 < moon_elongation < 180
+
+# Get illumination info
 illum = Illumination(Body.Moon, utc)
-phase_angle = illum.phase_angle  # 0° = new moon, 180° = full moon
+phase_angle = illum.phase_angle  # 0° = full, 180° = new
 illumination = illum.phase_fraction
 
 # Determine phase name
-if phase_angle < 22.5 or phase_angle >= 337.5:
-    phase_name = "Uusikuu" # New moon
-elif phase_angle < 67.5:
-    phase_name = "Kasvava sirppi" # Waxing crescent
-elif phase_angle < 112.5:
-    phase_name = "Kuun ensimmäinen neljännes" # First quarter
-elif phase_angle < 157.5:
-    phase_name = "Kasvava kupera kuu" # Waxing gibbous
-elif phase_angle < 202.5:
-    phase_name = "Täysikuu" # Full moon
-elif phase_angle < 247.5:
-    phase_name = "Vähenevä kupera kuu" # Waning gibbous
-elif phase_angle < 292.5:
-    phase_name = "Kuun viimeinen neljännes" # Last quarter
-else:
-    phase_name = "Vähenevä sirppi" # Waning crescent
-
-
+if illumination > 0.99:
+    phase_name = "Täysikuu"  # Full moon
+elif illumination < 0.01:
+    phase_name = "Uusikuu"  # New moon
+elif is_waxing:
+    if illumination > 0.75:
+        phase_name = "Kasvava kupera kuu"  # Waxing gibbous
+    elif illumination > 0.25:
+        phase_name = "Kuun ensimmäinen neljännes"  # First quarter
+    else:
+        phase_name = "Kasvava sirppi"  # Waxing crescent
+else:  # Waning
+    if illumination > 0.75:
+        phase_name = "Vähenevä kupera kuu"  # Waning gibbous
+    elif illumination > 0.25:
+        phase_name = "Kuun viimeinen neljännes"  # Last quarter
+    else:
+        phase_name = "Vähenevä sirppi"  # Waning crescent
 
 
 
@@ -507,10 +522,9 @@ else:
 
 
 
-
 # Position for moon phase circle
 moon_indicator_x = text_x - 0.05
-moon_indicator_y = text_y + 0.25
+moon_indicator_y = text_y + 0.3
 moon_radius = 0.035
 
 # Draw dark gray base circle
@@ -518,20 +532,18 @@ ax.add_patch(plt.Circle((moon_indicator_x, moon_indicator_y), moon_radius,
                         fill=True, color='#404040', alpha=0.9, zorder=10))
 
 # Draw illuminated part with proper terminator
-theta = np.linspace(0, 2*np.pi, 200)
+theta_circle = np.linspace(0, 2*np.pi, 200)  # Renamed to avoid conflict
 
-if phase_angle < 180:  # Waxing
-    # Right semicircle (always lit during waxing)
-    mask_right = np.cos(theta) >= 0
-    # Left side varies with phase
-    k = np.cos(np.radians(phase_angle))  # -1 (new) to 1 (full)
+# Moon phase circle (Northern Hemisphere view)
+if is_waxing:  # Right side lit
+    k = (illumination * 2 - 1)  # -1 (crescent) to 1 (gibbous)
     
     x_coords = []
     y_coords = []
-    for i, t in enumerate(theta):
+    for t in theta_circle:  # Use theta_circle instead of theta
         cos_t = np.cos(t)
         sin_t = np.sin(t)
-        if cos_t >= 0:  # Right side
+        if cos_t >= 0:  # Right side - always lit
             x_coords.append(moon_indicator_x + moon_radius * cos_t)
             y_coords.append(moon_indicator_y + moon_radius * sin_t)
         else:  # Left side - ellipse
@@ -540,16 +552,15 @@ if phase_angle < 180:  # Waxing
     
     ax.fill(x_coords, y_coords, color='white', alpha=0.9, zorder=11)
     
-else:  # Waning
-    # Left semicircle (always lit during waning)
-    k = np.cos(np.radians(180 - phase_angle))  # 1 (full) to -1 (new)
+else:  # Waning - left side lit
+    k = (illumination * 2 - 1)  # -1 (crescent) to 1 (gibbous)
     
     x_coords = []
     y_coords = []
-    for i, t in enumerate(theta):
+    for t in theta_circle:  # Use theta_circle instead of theta
         cos_t = np.cos(t)
         sin_t = np.sin(t)
-        if cos_t <= 0:  # Left side
+        if cos_t <= 0:  # Left side - always lit
             x_coords.append(moon_indicator_x + moon_radius * cos_t)
             y_coords.append(moon_indicator_y + moon_radius * sin_t)
         else:  # Right side - ellipse
@@ -566,9 +577,15 @@ days_to_full = next_full_moon.ut - utc.ut  # Difference in days
 
 
 
+# Plot text
+info_text = (
+    f"{phase_name}\n"
+    f"{days_to_full:.0f} pv täysikuuhun\n"
+    f"\n"
+    f"☀ {sunrise_time}  🌙 {sunset_time}\n"
+    f"Päivänvalo: {daylight_hours} h {daylight_mins} min"
+)
 
-# Add text
-info_text = f"{phase_name}\n{days_to_full:.0f} päivää seuraavaan täysikuuhun\nPäivänvalo: {daylight_hours} h {daylight_mins} min\n☀ {sunrise_time}  🌙 {sunset_time}"
 ax.text(text_x, text_y, info_text,
         color='white', fontsize=10,
         ha='right', va='bottom',
