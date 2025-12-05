@@ -1,4 +1,4 @@
-from astronomy import Time, Body, EclipticLongitude, GeoVector, Observer, SearchRiseSet, Direction, Illumination, SearchMoonPhase, Elongation
+from astronomy import Time, Body, EclipticLongitude, GeoVector, Observer, SearchRiseSet, Direction, Illumination, SearchMoonPhase
 import math
 import matplotlib.pyplot as plt
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
@@ -472,18 +472,29 @@ daylight_mins = daylight_minutes % 60
 
 
 
-# Get Moon elongation (angle from Sun)
-moon_elong_event = Elongation(Body.Moon, utc)
-moon_elongation = moon_elong_event.elongation  # Get the angle value
 
-# Elongation: 0° to 180° = waxing (Moon east of Sun)
-#            180° to 360° = waning (Moon west of Sun)
-is_waxing = 0 < moon_elongation < 180
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # Get illumination info
 illum = Illumination(Body.Moon, utc)
-phase_angle = illum.phase_angle  # 0° = full, 180° = new
+phase_angle = illum.phase_angle  # 0° = full, 180° = new, 360° = full
 illumination = illum.phase_fraction
+
+# Determine waxing vs waning from phase_angle
+is_waxing = phase_angle > 180  # 180° to 360° = waxing
 
 # Determine phase name
 if illumination > 0.99:
@@ -504,6 +515,19 @@ else:  # Waning
         phase_name = "Kuun viimeinen neljännes"  # Last quarter
     else:
         phase_name = "Vähenevä sirppi"  # Waning crescent
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -582,15 +606,14 @@ info_text = (
     f"{phase_name}\n"
     f"{days_to_full:.0f} pv täysikuuhun\n"
     f"\n"
-    f"☀ {sunrise_time}  🌙 {sunset_time}\n"
+    f"☀ {sunrise_time}  ☾ {sunset_time}\n"
     f"Päivänvalo: {daylight_hours} h {daylight_mins} min"
 )
 
 ax.text(text_x, text_y, info_text,
         color='white', fontsize=10,
         ha='right', va='bottom',
-        alpha=0.7,
-        fontproperties=font_manager.FontProperties(family='Segoe UI Emoji'))
+        alpha=0.7)
 
 
 
