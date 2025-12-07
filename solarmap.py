@@ -15,7 +15,6 @@ from matplotlib import font_manager
 #TODO: Comets? (Halley, Hale-Bopp)
 
 #Visual customizations
-#TODO: Fix moon phase display and names
 #TODO: Fix stars cutoff from top and bottom
 #TODO: Planet labels working with different DPIs
 #TODO: Optional background stars
@@ -54,7 +53,6 @@ planet_colors = {
     'Uranus':   '#4FD0E0',
     'Neptune':  '#4166F5'
 }
-
 
 # Planet list
 planets = [Body.Mercury, Body.Venus, Body.Earth, Body.Mars,
@@ -262,6 +260,7 @@ ax.scatter(asteroid_x, asteroid_y, s=asteroid_sizes, c='white', alpha=asteroid_a
 
 
 
+
 #   Kuiper belt beyond Neptune
 neptune_r = planet_radii['Neptune']
 kuiper_inner = neptune_r * 1.05
@@ -288,7 +287,6 @@ kuiper_alphas *= 0.3
 #   Single scatter call with alpha array
 ax.scatter(kuiper_x, kuiper_y, s=kuiper_sizes, c='white', 
            alpha=kuiper_alphas, marker='.')
-
 
 # Jupiter Trojans - get Jupiter's position
 jupiter_r = planet_radii['Jupiter']
@@ -439,7 +437,18 @@ ax.axis('off')
 # Bottom right corner info
 from astronomy import SearchRiseSet, Direction, Observer
 
-# Location coordinates
+# Calculate text position (bottom right with taskbar offset)
+fig_width, fig_height = fig.get_size_inches()
+aspect = fig_width / fig_height
+
+if aspect > 1:
+    text_x = 1.3 * aspect - 0.05
+    text_y = -1.3 + (taskbar_offset * 2.6) + 0.1
+else:
+    text_x = 1.3 - 0.05
+    text_y = (-1.3 / aspect) + (taskbar_offset * 2.6) + 0.1
+
+# Geolocation coordinates
 latitude = 60.06977
 longitude = 23.66283
 
@@ -472,29 +481,15 @@ daylight_mins = daylight_minutes % 60
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# Get illumination info
+# Get moon phase info
 illum = Illumination(Body.Moon, utc)
-phase_angle = illum.phase_angle  # 0° = full, 180° = new, 360° = full
+phase_angle = illum.phase_angle
 illumination = illum.phase_fraction
 
-# Determine waxing vs waning from phase_angle
-is_waxing = phase_angle > 180  # 180° to 360° = waxing
+# Determine waxing vs waning by checking if illumination is increasing
+# Sample 1 hour later to see if moon is getting brighter or darker
+future_illum = Illumination(Body.Moon, utc.AddDays(1.0/24.0))
+is_waxing = future_illum.phase_fraction > illumination
 
 # Determine phase name
 if illumination > 0.99:
@@ -516,36 +511,6 @@ else:  # Waning
     else:
         phase_name = "Vähenevä sirppi"  # Waning crescent
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# Calculate text position (bottom right with taskbar offset)
-fig_width, fig_height = fig.get_size_inches()
-aspect = fig_width / fig_height
-
-if aspect > 1:
-    text_x = 1.3 * aspect - 0.05
-    text_y = -1.3 + (taskbar_offset * 2.6) + 0.1
-else:
-    text_x = 1.3 - 0.05
-    text_y = (-1.3 / aspect) + (taskbar_offset * 2.6) + 0.1
-
-
-
-
 # Position for moon phase circle
 moon_indicator_x = text_x - 0.05
 moon_indicator_y = text_y + 0.3
@@ -555,44 +520,53 @@ moon_radius = 0.035
 ax.add_patch(plt.Circle((moon_indicator_x, moon_indicator_y), moon_radius, 
                         fill=True, color='#404040', alpha=0.9, zorder=10))
 
-# Draw illuminated part with proper terminator
-theta_circle = np.linspace(0, 2*np.pi, 200)  # Renamed to avoid conflict
+# Draw illuminated part
+if illumination > 0.01:
+    theta = np.linspace(np.pi/2, -np.pi/2, 100)
+    
+    if is_waxing:
+        # Right side lit
+        x_outer = moon_indicator_x + moon_radius * np.cos(theta)
+        y_outer = moon_indicator_y + moon_radius * np.sin(theta)
+        
+        terminator_x_pos = moon_radius - (2 * illumination * moon_radius)
+        curve_amount = abs(illumination - 0.5) * 2
+        ellipse_width = curve_amount * moon_radius
+        
+        if illumination < 0.5:
+            x_terminator = moon_indicator_x + ellipse_width * np.cos(theta)
+        else:
+            x_terminator = moon_indicator_x - ellipse_width * np.cos(theta)
+        y_terminator = moon_indicator_y + moon_radius * np.sin(theta)
+        
+        x_lit = np.concatenate([x_outer, x_terminator[::-1]])
+        y_lit = np.concatenate([y_outer, y_terminator[::-1]])
+        
+        ax.fill(x_lit, y_lit, color='white', alpha=0.9, zorder=11)
+        
+    else:
+        # Left side lit
+        x_outer = moon_indicator_x - moon_radius * np.cos(theta)
+        y_outer = moon_indicator_y + moon_radius * np.sin(theta)
+        
+        terminator_x_pos = -moon_radius + (2 * illumination * moon_radius)
+        curve_amount = abs(illumination - 0.5) * 2
+        ellipse_width = curve_amount * moon_radius
+        
+        if illumination > 0.5:
+            x_terminator = moon_indicator_x + ellipse_width * np.cos(theta)
+        else:
+            x_terminator = moon_indicator_x - ellipse_width * np.cos(theta)
+        y_terminator = moon_indicator_y + moon_radius * np.sin(theta)
+        
+        x_lit = np.concatenate([x_outer, x_terminator[::-1]])
+        y_lit = np.concatenate([y_outer, y_terminator[::-1]])
+        
+        ax.fill(x_lit, y_lit, color='white', alpha=0.9, zorder=11)
 
-# Moon phase circle (Northern Hemisphere view)
-if is_waxing:  # Right side lit
-    k = (illumination * 2 - 1)  # -1 (crescent) to 1 (gibbous)
-    
-    x_coords = []
-    y_coords = []
-    for t in theta_circle:  # Use theta_circle instead of theta
-        cos_t = np.cos(t)
-        sin_t = np.sin(t)
-        if cos_t >= 0:  # Right side - always lit
-            x_coords.append(moon_indicator_x + moon_radius * cos_t)
-            y_coords.append(moon_indicator_y + moon_radius * sin_t)
-        else:  # Left side - ellipse
-            x_coords.append(moon_indicator_x + moon_radius * k * cos_t)
-            y_coords.append(moon_indicator_y + moon_radius * sin_t)
-    
-    ax.fill(x_coords, y_coords, color='white', alpha=0.9, zorder=11)
-    
-else:  # Waning - left side lit
-    k = (illumination * 2 - 1)  # -1 (crescent) to 1 (gibbous)
-    
-    x_coords = []
-    y_coords = []
-    for t in theta_circle:  # Use theta_circle instead of theta
-        cos_t = np.cos(t)
-        sin_t = np.sin(t)
-        if cos_t <= 0:  # Left side - always lit
-            x_coords.append(moon_indicator_x + moon_radius * cos_t)
-            y_coords.append(moon_indicator_y + moon_radius * sin_t)
-        else:  # Right side - ellipse
-            x_coords.append(moon_indicator_x + moon_radius * k * cos_t)
-            y_coords.append(moon_indicator_y + moon_radius * sin_t)
-    
-    ax.fill(x_coords, y_coords, color='white', alpha=0.9, zorder=11)
-
+# Draw outline
+ax.add_patch(plt.Circle((moon_indicator_x, moon_indicator_y), moon_radius, 
+                        fill=False, color='white', linewidth=0.1, zorder=12))
 
 # Search for next full moon (phase 180°) within next 30 days
 next_full_moon = SearchMoonPhase(180, utc, 30)
@@ -606,8 +580,8 @@ info_text = (
     f"{phase_name}\n"
     f"{days_to_full:.0f} pv täysikuuhun\n"
     f"\n"
-    f"☀ {sunrise_time}  ☾ {sunset_time}\n"
-    f"Päivänvalo: {daylight_hours} h {daylight_mins} min"
+    f"Päivänvalo klo {sunrise_time} - {sunset_time}\n"
+    f"{daylight_hours} t {daylight_mins} min"
 )
 
 ax.text(text_x, text_y, info_text,
