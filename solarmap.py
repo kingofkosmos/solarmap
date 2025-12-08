@@ -8,6 +8,7 @@ import cairosvg
 import numpy as np
 from matplotlib import font_manager
 import datetime
+from astronomy import SearchRiseSet, Direction, Observer
 
 
 #Object additions
@@ -24,14 +25,18 @@ import datetime
 #TODO: Trailing orbits optimization with wedges
 
 
+# CONFIGURATION VARIABLES
+# -----------------------------------------------
 
+# Bottom right text toggle
+show_info_text = True  # Set to False to hide info text
 
 # Custom time input
 custom_date = None  # Format: "YYYY-MM-DD", set to None for current time
 
 # Orbital trails toggle
 show_trails = True
-trail_days = 150  # How many days to show in the past
+trail_days = 150  # How long the trails are in days
 
 # Planet names toggle
 show_planet_names = False  # Set to False to hide names
@@ -55,12 +60,13 @@ planet_colors = {
     'Neptune':  '#4166F5'
 }
 
+# -----------------------------------------------
+
+
+
 # Planet list
 planets = [Body.Mercury, Body.Venus, Body.Earth, Body.Mars,
     Body.Jupiter, Body.Saturn, Body.Uranus, Body.Neptune]
-
-
-
 
 # Convert planet SVG icons to OffsetImages
 def svg_to_imagebox(svg_path, zoom=0.1, color=None):
@@ -435,166 +441,165 @@ ax.axis('off')
 
 
 
-# Bottom right corner info
-from astronomy import SearchRiseSet, Direction, Observer
+# Bottom right text
+if show_info_text:
+    # Calculate text position (bottom right with taskbar offset)
+    fig_width, fig_height = fig.get_size_inches()
+    aspect = fig_width / fig_height
 
-# Calculate text position (bottom right with taskbar offset)
-fig_width, fig_height = fig.get_size_inches()
-aspect = fig_width / fig_height
-
-if aspect > 1:
-    text_x = 1.3 * aspect - 0.05
-    text_y = -1.3 + (taskbar_offset * 2.6) + 0.1
-else:
-    text_x = 1.3 - 0.05
-    text_y = (-1.3 / aspect) + (taskbar_offset * 2.6) + 0.1
-
-# Geolocation coordinates
-latitude = 60.06977
-longitude = 23.66283
-
-# Get sunrise and sunset for today
-observer = Observer(latitude, longitude, 0)
-sunrise_time_obj = SearchRiseSet(Body.Sun, observer, Direction.Rise, utc, 1)
-sunset_time_obj = SearchRiseSet(Body.Sun, observer, Direction.Set, utc, 1)
-
-# Convert to local time
-# (Finland is UTC+2, except between last Sunday in March to last Sunday in October UTC+3)
-cal = [int(x) for x in utc.Calendar()[:6]]
-dt = datetime.datetime(*cal)
-last_sun = lambda m: 31 - (dt.replace(month=m, day=31).weekday() + 1) % 7
-local_offset_hours = 3 if (3 < dt.month < 10 or 
-    (dt.month == 3 and dt.day >= last_sun(3)) or 
-    (dt.month == 10 and dt.day < last_sun(10))) else 2
-
-# Use Calendar() to get datetime components (returns tuple: year, month, day, hour, minute, second)
-sunrise_cal = sunrise_time_obj.Calendar()
-sunset_cal = sunset_time_obj.Calendar()
-
-sunrise_hour = (sunrise_cal[3] + local_offset_hours) % 24
-sunrise_minute = sunrise_cal[4]
-
-sunset_hour = (sunset_cal[3] + local_offset_hours) % 24
-sunset_minute = sunset_cal[4]
-
-sunrise_time = f"{sunrise_hour}:{sunrise_minute:02d}"
-sunset_time = f"{sunset_hour}:{sunset_minute:02d}"
-
-# Calculate daylight hours
-daylight_minutes = (sunset_hour * 60 + sunset_minute) - (sunrise_hour * 60 + sunrise_minute)
-daylight_hours = daylight_minutes // 60
-daylight_mins = daylight_minutes % 60
-
-
-
-
-# Get moon phase info
-illum = Illumination(Body.Moon, utc)
-phase_angle = illum.phase_angle
-illumination = illum.phase_fraction
-
-# Determine waxing vs waning by checking if illumination is increasing
-# Sample 1 hour later to see if moon is getting brighter or darker
-future_illum = Illumination(Body.Moon, utc.AddDays(1.0/24.0))
-is_waxing = future_illum.phase_fraction > illumination
-
-# Determine phase name
-if illumination > 0.99:
-    phase_name = "Täysikuu"  # Full moon
-elif illumination < 0.01:
-    phase_name = "Uusikuu"  # New moon
-elif is_waxing:
-    if illumination > 0.75:
-        phase_name = "Kasvava kupera kuu"  # Waxing gibbous
-    elif illumination > 0.25:
-        phase_name = "Kuun ensimmäinen neljännes"  # First quarter
+    if aspect > 1:
+        text_x = 1.3 * aspect - 0.05
+        text_y = -1.3 + (taskbar_offset * 2.6) + 0.1
     else:
-        phase_name = "Kasvava sirppi"  # Waxing crescent
-else:  # Waning
-    if illumination > 0.75:
-        phase_name = "Vähenevä kupera kuu"  # Waning gibbous
-    elif illumination > 0.25:
-        phase_name = "Kuun viimeinen neljännes"  # Last quarter
-    else:
-        phase_name = "Vähenevä sirppi"  # Waning crescent
+        text_x = 1.3 - 0.05
+        text_y = (-1.3 / aspect) + (taskbar_offset * 2.6) + 0.1
 
-# Position for moon phase circle
-moon_indicator_x = text_x - 0.05
-moon_indicator_y = text_y + 0.3
-moon_radius = 0.035
+    # Geolocation coordinates
+    latitude = 60.06977
+    longitude = 23.66283
 
-# Draw dark gray base circle
-ax.add_patch(plt.Circle((moon_indicator_x, moon_indicator_y), moon_radius, 
-                        fill=True, color='#404040', alpha=0.9, zorder=10))
+    # Get sunrise and sunset for today
+    observer = Observer(latitude, longitude, 0)
+    sunrise_time_obj = SearchRiseSet(Body.Sun, observer, Direction.Rise, utc, 1)
+    sunset_time_obj = SearchRiseSet(Body.Sun, observer, Direction.Set, utc, 1)
 
-# Draw illuminated part
-if illumination > 0.01:
-    theta = np.linspace(np.pi/2, -np.pi/2, 100)
-    
-    if is_waxing:
-        # Right side lit
-        x_outer = moon_indicator_x + moon_radius * np.cos(theta)
-        y_outer = moon_indicator_y + moon_radius * np.sin(theta)
-        
-        terminator_x_pos = moon_radius - (2 * illumination * moon_radius)
-        curve_amount = abs(illumination - 0.5) * 2
-        ellipse_width = curve_amount * moon_radius
-        
-        if illumination < 0.5:
-            x_terminator = moon_indicator_x + ellipse_width * np.cos(theta)
+    # Convert to local time
+    # (Finland is UTC+2, except between last Sunday in March to last Sunday in October UTC+3)
+    cal = [int(x) for x in utc.Calendar()[:6]]
+    dt = datetime.datetime(*cal)
+    last_sun = lambda m: 31 - (dt.replace(month=m, day=31).weekday() + 1) % 7
+    local_offset_hours = 3 if (3 < dt.month < 10 or 
+        (dt.month == 3 and dt.day >= last_sun(3)) or 
+        (dt.month == 10 and dt.day < last_sun(10))) else 2
+
+    # Use Calendar() to get datetime components (returns tuple: year, month, day, hour, minute, second)
+    sunrise_cal = sunrise_time_obj.Calendar()
+    sunset_cal = sunset_time_obj.Calendar()
+
+    sunrise_hour = (sunrise_cal[3] + local_offset_hours) % 24
+    sunrise_minute = sunrise_cal[4]
+
+    sunset_hour = (sunset_cal[3] + local_offset_hours) % 24
+    sunset_minute = sunset_cal[4]
+
+    sunrise_time = f"{sunrise_hour}:{sunrise_minute:02d}"
+    sunset_time = f"{sunset_hour}:{sunset_minute:02d}"
+
+    # Calculate daylight hours
+    daylight_minutes = (sunset_hour * 60 + sunset_minute) - (sunrise_hour * 60 + sunrise_minute)
+    daylight_hours = daylight_minutes // 60
+    daylight_mins = daylight_minutes % 60
+
+
+
+
+    # Get moon phase info
+    illum = Illumination(Body.Moon, utc)
+    phase_angle = illum.phase_angle
+    illumination = illum.phase_fraction
+
+    # Determine waxing vs waning by checking if illumination is increasing
+    # Sample 1 hour later to see if moon is getting brighter or darker
+    future_illum = Illumination(Body.Moon, utc.AddDays(1.0/24.0))
+    is_waxing = future_illum.phase_fraction > illumination
+
+    # Determine phase name
+    if illumination > 0.99:
+        phase_name = "Täysikuu"  # Full moon
+    elif illumination < 0.01:
+        phase_name = "Uusikuu"  # New moon
+    elif is_waxing:
+        if illumination > 0.75:
+            phase_name = "Kasvava kupera kuu"  # Waxing gibbous
+        elif illumination > 0.25:
+            phase_name = "Kuun ensimmäinen neljännes"  # First quarter
         else:
-            x_terminator = moon_indicator_x - ellipse_width * np.cos(theta)
-        y_terminator = moon_indicator_y + moon_radius * np.sin(theta)
-        
-        x_lit = np.concatenate([x_outer, x_terminator[::-1]])
-        y_lit = np.concatenate([y_outer, y_terminator[::-1]])
-        
-        ax.fill(x_lit, y_lit, color='white', alpha=0.9, zorder=11)
-        
-    else:
-        # Left side lit
-        x_outer = moon_indicator_x - moon_radius * np.cos(theta)
-        y_outer = moon_indicator_y + moon_radius * np.sin(theta)
-        
-        terminator_x_pos = -moon_radius + (2 * illumination * moon_radius)
-        curve_amount = abs(illumination - 0.5) * 2
-        ellipse_width = curve_amount * moon_radius
-        
-        if illumination > 0.5:
-            x_terminator = moon_indicator_x + ellipse_width * np.cos(theta)
+            phase_name = "Kasvava sirppi"  # Waxing crescent
+    else:  # Waning
+        if illumination > 0.75:
+            phase_name = "Vähenevä kupera kuu"  # Waning gibbous
+        elif illumination > 0.25:
+            phase_name = "Kuun viimeinen neljännes"  # Last quarter
         else:
-            x_terminator = moon_indicator_x - ellipse_width * np.cos(theta)
-        y_terminator = moon_indicator_y + moon_radius * np.sin(theta)
+            phase_name = "Vähenevä sirppi"  # Waning crescent
+
+    # Position for moon phase circle
+    moon_indicator_x = text_x - 0.05
+    moon_indicator_y = text_y + 0.3
+    moon_radius = 0.035
+
+    # Draw dark gray base circle
+    ax.add_patch(plt.Circle((moon_indicator_x, moon_indicator_y), moon_radius, 
+                            fill=True, color='#404040', alpha=0.9, zorder=10))
+
+    # Draw illuminated part
+    if illumination > 0.01:
+        theta = np.linspace(np.pi/2, -np.pi/2, 100)
         
-        x_lit = np.concatenate([x_outer, x_terminator[::-1]])
-        y_lit = np.concatenate([y_outer, y_terminator[::-1]])
-        
-        ax.fill(x_lit, y_lit, color='white', alpha=0.9, zorder=11)
+        if is_waxing:
+            # Right side lit
+            x_outer = moon_indicator_x + moon_radius * np.cos(theta)
+            y_outer = moon_indicator_y + moon_radius * np.sin(theta)
+            
+            terminator_x_pos = moon_radius - (2 * illumination * moon_radius)
+            curve_amount = abs(illumination - 0.5) * 2
+            ellipse_width = curve_amount * moon_radius
+            
+            if illumination < 0.5:
+                x_terminator = moon_indicator_x + ellipse_width * np.cos(theta)
+            else:
+                x_terminator = moon_indicator_x - ellipse_width * np.cos(theta)
+            y_terminator = moon_indicator_y + moon_radius * np.sin(theta)
+            
+            x_lit = np.concatenate([x_outer, x_terminator[::-1]])
+            y_lit = np.concatenate([y_outer, y_terminator[::-1]])
+            
+            ax.fill(x_lit, y_lit, color='white', alpha=0.9, zorder=11)
+            
+        else:
+            # Left side lit
+            x_outer = moon_indicator_x - moon_radius * np.cos(theta)
+            y_outer = moon_indicator_y + moon_radius * np.sin(theta)
+            
+            terminator_x_pos = -moon_radius + (2 * illumination * moon_radius)
+            curve_amount = abs(illumination - 0.5) * 2
+            ellipse_width = curve_amount * moon_radius
+            
+            if illumination > 0.5:
+                x_terminator = moon_indicator_x + ellipse_width * np.cos(theta)
+            else:
+                x_terminator = moon_indicator_x - ellipse_width * np.cos(theta)
+            y_terminator = moon_indicator_y + moon_radius * np.sin(theta)
+            
+            x_lit = np.concatenate([x_outer, x_terminator[::-1]])
+            y_lit = np.concatenate([y_outer, y_terminator[::-1]])
+            
+            ax.fill(x_lit, y_lit, color='white', alpha=0.9, zorder=11)
 
-# Draw outline
-ax.add_patch(plt.Circle((moon_indicator_x, moon_indicator_y), moon_radius, 
-                        fill=False, color='white', linewidth=0.1, zorder=12))
+    # Draw outline
+    ax.add_patch(plt.Circle((moon_indicator_x, moon_indicator_y), moon_radius, 
+                            fill=False, color='white', linewidth=0.1, zorder=12))
 
-# Search for next full moon (phase 180°) within next 30 days
-next_full_moon = SearchMoonPhase(180, utc, 30)
-days_to_full = next_full_moon.ut - utc.ut  # Difference in days
-
-
+    # Search for next full moon (phase 180°) within next 30 days
+    next_full_moon = SearchMoonPhase(180, utc, 30)
+    days_to_full = next_full_moon.ut - utc.ut  # Difference in days
 
 
-# Plot text
-info_text = (
-    f"{phase_name}\n"
-    f"{days_to_full:.0f} pv täysikuuhun\n"
-    f"\n"
-    f"Päivänvalo klo {sunrise_time} - {sunset_time}\n"
-    f"{daylight_hours} t {daylight_mins} min"
-)
 
-ax.text(text_x, text_y, info_text,
-        color='white', fontsize=10,
-        ha='right', va='bottom',
-        alpha=0.7)
+
+    # Plot text
+    info_text = (
+        f"{phase_name}\n"
+        f"{days_to_full:.0f} pv täysikuuhun\n"
+        f"\n"
+        f"Päivänvalo klo {sunrise_time} - {sunset_time}\n"
+        f"{daylight_hours} t {daylight_mins} min"
+    )
+
+    ax.text(text_x, text_y, info_text,
+            color='white', fontsize=10,
+            ha='right', va='bottom',
+            alpha=0.7)
 
 
 
