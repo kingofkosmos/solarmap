@@ -7,6 +7,7 @@ import io
 import cairosvg
 import numpy as np
 from matplotlib import font_manager
+import datetime
 
 
 #Object additions
@@ -457,8 +458,14 @@ observer = Observer(latitude, longitude, 0)
 sunrise_time_obj = SearchRiseSet(Body.Sun, observer, Direction.Rise, utc, 1)
 sunset_time_obj = SearchRiseSet(Body.Sun, observer, Direction.Set, utc, 1)
 
-# Convert to local time (Helsinki is UTC+2 in winter, UTC+3 in summer)
-local_offset_hours = 2  # Adjust to 3 for summer time
+# Convert to local time
+# (Finland is UTC+2, except between last Sunday in March to last Sunday in October UTC+3)
+cal = [int(x) for x in utc.Calendar()[:6]]
+dt = datetime.datetime(*cal)
+last_sun = lambda m: 31 - (dt.replace(month=m, day=31).weekday() + 1) % 7
+local_offset_hours = 3 if (3 < dt.month < 10 or 
+    (dt.month == 3 and dt.day >= last_sun(3)) or 
+    (dt.month == 10 and dt.day < last_sun(10))) else 2
 
 # Use Calendar() to get datetime components (returns tuple: year, month, day, hour, minute, second)
 sunrise_cal = sunrise_time_obj.Calendar()
