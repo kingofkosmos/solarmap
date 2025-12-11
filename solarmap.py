@@ -17,7 +17,6 @@ from astronomy import SearchRiseSet, Direction, Observer
 #TODO: Comets? (Halley, Hale-Bopp)
 
 #Visual customizations
-#TODO: Fix stars cutoff from top and bottom
 #TODO: Planet labels working with different DPIs
 #TODO: Optional background stars
 #TODO: Optional colors to rings
@@ -606,5 +605,24 @@ if show_info_text:
 
 # Save and show
 plt.tight_layout()
-fig.savefig("solarmap.png", dpi=dpi)
+
+# Render at larger size to avoid edge clipping
+overscan = 1.05  # 5 % extra on each side
+temp_dpi = int(dpi * overscan)
+fig.savefig("temp_overscan.png", dpi=temp_dpi)
+
+# Crop to exact size
+from PIL import Image
+img = Image.open("temp_overscan.png")
+w, h = img.size
+crop_w = int(width_px)
+crop_h = int(height_px)
+left = (w - crop_w) // 2
+top = (h - crop_h) // 2
+cropped = img.crop((left, top, left + crop_w, top + crop_h))
+cropped.save("solarmap.png")
+
+import os
+os.remove("temp_overscan.png")
+
 plt.show()
