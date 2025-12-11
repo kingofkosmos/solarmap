@@ -17,6 +17,7 @@ from astronomy import SearchRiseSet, Direction, Observer
 #TODO: Comets? (Halley, Hale-Bopp)
 
 #Visual customizations
+#TODO: Arguments for command line usage
 #TODO: Planet labels working with different DPIs
 #TODO: Optional background stars
 #TODO: Optional colors to rings
@@ -508,16 +509,16 @@ if show_info_text:
     elif illumination < 0.01:
         phase_name = "Uusikuu"  # New moon
     elif is_waxing:
-        if illumination > 0.75:
+        if illumination > 0.55:
             phase_name = "Kasvava kupera kuu"  # Waxing gibbous
-        elif illumination > 0.25:
+        elif illumination > 0.45:
             phase_name = "Kuun ensimmäinen neljännes"  # First quarter
         else:
             phase_name = "Kasvava sirppi"  # Waxing crescent
     else:  # Waning
-        if illumination > 0.75:
+        if illumination > 0.55:
             phase_name = "Vähenevä kupera kuu"  # Waning gibbous
-        elif illumination > 0.25:
+        elif illumination > 0.45:
             phase_name = "Kuun viimeinen neljännes"  # Last quarter
         else:
             phase_name = "Vähenevä sirppi"  # Waning crescent
