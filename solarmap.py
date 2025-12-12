@@ -1,20 +1,22 @@
-from astronomy import Time, Body, EclipticLongitude, GeoVector, Observer, SearchRiseSet, Direction, Illumination, SearchMoonPhase
+from astronomy import Time, Body, EclipticLongitude, GeoVector, Observer, SearchRiseSet, Direction, Illumination, SearchMoonPhase, JupiterMoons
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+from matplotlib import font_manager
 import math
 import matplotlib.pyplot as plt
-from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import matplotlib.image as mpimg
 import io
 import cairosvg
 import numpy as np
-from matplotlib import font_manager
 import datetime
-from astronomy import SearchRiseSet, Direction, Observer
 
 
 #Object additions
-#TODO: Dwarf planets? (Pluto, Ceres, Haumea, Makemake, Eris)
-#TODO: Moons? (Ganymede, Callisto, Io, Europa, Titan, Phobos, Deimos)
-#TODO: Comets? (Halley, Hale-Bopp)
+#TODO: Next largest object:
+#       Titan (Saturn)
+#       Triton (Neptune)
+#       Pluto
+#       ...Phobos and Deimos (Mars)
+#TODO: Comets (Halley, Hale-Bopp)
 
 #Visual customizations
 #TODO: Arguments for command line usage
@@ -299,7 +301,7 @@ ax.scatter(kuiper_x, kuiper_y, s=kuiper_sizes, c='white',
 jupiter_r = planet_radii['Jupiter']
 jupiter_L = longitudes['Jupiter'] % 360
 
-def trojan_cloud(jupiter_r, jupiter_L, offset_deg, n=1200):
+def trojan_cloud(jupiter_r, jupiter_L, offset_deg, n=700):
     # L4 (+60°) or L5 (−60°)
     center_angle = math.radians(-(0 - ((jupiter_L + offset_deg) % 360)))
 
@@ -332,6 +334,40 @@ trojan_cloud(jupiter_r, jupiter_L, -60)   # L5
 
 
 
+
+# Jupiter's moon rings
+jupiter_L = longitudes['Jupiter'] % 360
+jupiter_theta_deg = 0 - jupiter_L
+jupiter_theta = math.radians(-jupiter_theta_deg)
+jupiter_x = cx + jupiter_r * math.cos(jupiter_theta)
+jupiter_y = cy + jupiter_r * math.sin(jupiter_theta)
+
+moon_radii = {
+    'Io': 0.10,
+    'Europa': 0.12,
+    'Ganymede': 0.14,
+    'Callisto': 0.16
+}
+
+moon_data = {
+    'Io': jm.io,
+    'Europa': jm.europa,
+    'Ganymede': jm.ganymede,
+    'Callisto': jm.callisto
+}
+
+jupiter_moon_color = '#C88B3A' if use_colors else 'white'
+
+for moon_name, moon_vec in moon_data.items():
+    angle = math.degrees(math.atan2(moon_vec.y, moon_vec.x))
+    theta = math.radians(-(0 - angle))
+    r = moon_radii[moon_name]
+    x = jupiter_x + r * math.cos(theta)
+    y = jupiter_y + r * math.sin(theta)
+
+    imagebox = svg_to_imagebox("icons/jupiter_moon.svg", zoom=0.08, color=jupiter_moon_color)
+    ab = AnnotationBbox(imagebox, (x, y), frameon=False)
+    ax.add_artist(ab)
 
 # Earth's Moon
 #     Moon ring
@@ -417,6 +453,44 @@ if show_trails:
         ax.plot([trail_positions_x[i], trail_positions_x[i+1]], 
                [trail_positions_y[i], trail_positions_y[i+1]], 
                color='white', alpha=alphas[i], linewidth=1.0)
+
+# Jupiter moons trails (using arcs)
+if show_trails:
+    # Arc fractions for each moon
+    arc_fractions = {
+        'Io': 1/3,
+        'Europa': 1/6,
+        'Ganymede': 1/10,
+        'Callisto': 1/12
+    }
+    
+    for moon_name in moon_data.keys():
+        # Get current moon position angle
+        moon_vec = moon_data[moon_name]
+        current_angle = math.degrees(math.atan2(moon_vec.y, moon_vec.x))
+        current_theta_deg = 0 - current_angle
+        
+        # Calculate arc span
+        arc_span = 360 * arc_fractions[moon_name]
+        
+        # Create arc from current position backwards
+        theta_start = math.radians(-current_theta_deg)
+        theta_end = math.radians(-(current_theta_deg + arc_span))
+        
+        # Generate arc points
+        theta_range = np.linspace(theta_start, theta_end, 50)
+        r = moon_radii[moon_name]
+        
+        arc_x = jupiter_x + r * np.cos(theta_range)
+        arc_y = jupiter_y + r * np.sin(theta_range)
+        
+        # Plot with fading alpha
+        alphas = np.linspace(0.6, 0, len(theta_range))
+        
+        for i in range(len(arc_x) - 1):
+            ax.plot([arc_x[i], arc_x[i+1]], 
+                   [arc_y[i], arc_y[i+1]], 
+                   color=jupiter_moon_color, alpha=alphas[i], linewidth=0.8)
 
 
 
