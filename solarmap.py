@@ -176,13 +176,7 @@ for _ in range(5, 8): # Rings 6 to 8
     rings.append(current)
 for r in rings: # Draw rings, dashed lines
     ax.add_patch(
-        plt.Circle(
-            (cx, cy),
-            r,
-            fill=False,
-            linewidth=0.4,
-            color='white',
-            linestyle=(0, (10, 10))))
+        plt.Circle((cx, cy), r, fill=False, linewidth=0.4, color='white', linestyle=(0, (10, 10))))
 
 #   Radii for each planet
 planet_radii = {p.name: rings[i] for i, p in enumerate(planets)}
@@ -212,18 +206,38 @@ for name, L in longitudes.items():
 
 #   Plot planet icons
     svg_path = f"icons/{name.lower()}.svg"
-    color = planet_colors.get(name) if use_colors else None
-    imagebox = svg_to_imagebox(svg_path, zoom=0.2, color=color)
-    ab = AnnotationBbox(imagebox, (x, y), frameon=False)
-    ax.add_artist(ab)
-
-    # Add planet name
-    if show_planet_names:
-        offset = planet_name_offsets.get(name, 0.05)
-        ax.text(x + offset, y - offset, name.lower(), 
-                color='white', fontsize=8, 
-                ha='left', va='top',
-                alpha=0.7)
+    
+    # Special handling for Earth to add green landmasses
+    if name == "Earth" and use_colors:
+        # Plot blue ocean base
+        imagebox = svg_to_imagebox(svg_path, zoom=0.2, color='#4A90E2')
+        ab = AnnotationBbox(imagebox, (x, y), frameon=False)
+        ax.add_artist(ab)
+        
+        # Plot green landmasses on top (the black paths in your SVG)
+        # We need to colorize only the black paths
+        from matplotlib.colors import hex2color
+        png_bytes = cairosvg.svg2png(url=svg_path)
+        image = mpimg.imread(io.BytesIO(png_bytes), format='png')
+        
+        # Create a copy for landmasses
+        land_image = image.copy()
+        green_rgb = hex2color('#006843')
+        
+        # Find black pixels (landmasses) and make them green
+        black_mask = (land_image[:, :, :3].max(axis=2) < 0.1)
+        for i in range(3):
+            land_image[:, :, i] = np.where(black_mask, green_rgb[i], 0)
+        land_image[:, :, 3] = np.where(black_mask, image[:, :, 3], 0)  # Preserve alpha only for land
+        
+        land_imagebox = OffsetImage(land_image, zoom=0.2)
+        land_ab = AnnotationBbox(land_imagebox, (x, y), frameon=False)
+        ax.add_artist(land_ab)
+    else:
+        color = planet_colors.get(name) if use_colors else None
+        imagebox = svg_to_imagebox(svg_path, zoom=0.2, color=color)
+        ab = AnnotationBbox(imagebox, (x, y), frameon=False)
+        ax.add_artist(ab)
 
 
 
@@ -436,8 +450,7 @@ if show_trails:
         for i in range(num_points - 1):
             ax.plot([arc_x[i], arc_x[i+1]], 
                    [arc_y[i], arc_y[i+1]], 
-                   color=planet_colors.get(name, 'white') if use_colors else 'white', 
-                   alpha=alphas[i], linewidth=1.5)
+                   color=planet_colors.get(name, 'white') if use_colors else 'white', alpha=alphas[i], linewidth=1.5)
 
 # Moon trail
 moon_trail_fraction = 1/2 
