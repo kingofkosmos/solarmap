@@ -11,11 +11,6 @@ import datetime
 
 
 #Object additions
-#TODO: Next largest object:
-#       Titan (Saturn)
-#       Triton (Neptune)
-#       Pluto
-#       ...Phobos and Deimos (Mars)
 #TODO: Comets (Halley, Hale-Bopp)
 
 #Visual customizations
@@ -24,7 +19,6 @@ import datetime
 #TODO: Optional background stars
 #TODO: Optional colors to rings
 #TODO: Optional colors to background
-#TODO: Earth green color for landmasses
 
 
 # CONFIGURATION VARIABLES
@@ -59,7 +53,8 @@ planet_colors = {
     'Jupiter':  '#C88B3A',
     'Saturn':   '#FAD5A5',
     'Uranus':   '#4FD0E0',
-    'Neptune':  '#4166F5'
+    'Neptune':  '#4166F5',
+    'Pluto':    '#A0826D'
 }
 
 # -----------------------------------------------
@@ -68,7 +63,7 @@ planet_colors = {
 
 # Planet list
 planets = [Body.Mercury, Body.Venus, Body.Earth, Body.Mars,
-    Body.Jupiter, Body.Saturn, Body.Uranus, Body.Neptune]
+    Body.Jupiter, Body.Saturn, Body.Uranus, Body.Neptune, Body.Pluto]
 
 # Convert planet SVG icons to OffsetImages
 def svg_to_imagebox(svg_path, zoom=0.1, color=None):
@@ -117,7 +112,7 @@ fig.set_size_inches(width_px/dpi, height_px/dpi)
 fig.patch.set_facecolor('black')
 ax.set_facecolor('black')
 cx, cy = 0, 0
-r_base = 0.85  # Ring radius base unit, change for bigger rings
+r_base = 0.80  # Ring radius base unit, change for bigger/smaller rings
 
 # Taskbar offset upwards percentage, change to move image upwards
 taskbar_offset = 0.02
@@ -171,7 +166,7 @@ for _ in range(1, 4): # Rings 2 to 4
     rings.append(current)
 current += step * 2 # Double gap
 rings.append(current) # Ring 5
-for _ in range(5, 8): # Rings 6 to 8
+for _ in range(5, 9): # Rings 6 to 9
     current += step
     rings.append(current)
 for r in rings: # Draw rings, dashed lines
@@ -358,9 +353,9 @@ jupiter_y = cy + jupiter_r * math.sin(jupiter_theta)
 
 moon_radii = {
     'Io': 0.10,
-    'Europa': 0.12,
-    'Ganymede': 0.14,
-    'Callisto': 0.16
+    'Europa': 0.11,
+    'Ganymede': 0.13,
+    'Callisto': 0.14
 }
 
 jm = JupiterMoons(utc)
@@ -380,7 +375,7 @@ for moon_name, moon_vec in moon_data.items():
     x = jupiter_x + r * math.cos(theta)
     y = jupiter_y + r * math.sin(theta)
 
-    imagebox = svg_to_imagebox("icons/jupiter_moon.svg", zoom=0.08, color=jupiter_moon_color)
+    imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.08, color=jupiter_moon_color)
     ab = AnnotationBbox(imagebox, (x, y), frameon=False)
     ax.add_artist(ab)
 
@@ -416,7 +411,8 @@ if show_trails:
         'Jupiter': 4333,
         'Saturn': 10759,
         'Uranus': 30687,
-        'Neptune': 60190
+        'Neptune': 60190,
+        'Pluto': 90560
     }
     
     for planet in planets:
@@ -482,12 +478,12 @@ if show_trails:
 
 # Jupiter moons trails
 if show_trails:
-    # Arc fractions for each moon
+    # Arc fraction lengths for each moon
     arc_fractions = {
         'Io': 1/3,
-        'Europa': 1/6,
-        'Ganymede': 1/10,
-        'Callisto': 1/12
+        'Europa': 1/5,
+        'Ganymede': 1/8,
+        'Callisto': 1/10
     }
     
     for moon_name in moon_data.keys():
@@ -605,23 +601,23 @@ if show_info_text:
 
     # Determine phase name
     if illumination > 0.99:
-        phase_name = "Täysikuu"  # Full moon
+        phase_name = "Täysikuu"  # "Full moon"
     elif illumination < 0.01:
-        phase_name = "Uusikuu"  # New moon
-    elif is_waxing:
+        phase_name = "Uusikuu"  # "New moon"
+    elif is_waxing: # Waxing
         if illumination > 0.55:
-            phase_name = "Kasvava kupera kuu"  # Waxing gibbous
+            phase_name = "Kasvava kupera kuu"  # "Waxing gibbous"
         elif illumination > 0.45:
-            phase_name = "Kuun ensimmäinen neljännes"  # First quarter
+            phase_name = "Puolikuu (ensimmäinen neljännes)"  # "First quarter"
         else:
-            phase_name = "Kasvava sirppi"  # Waxing crescent
+            phase_name = "Kasvava sirppi"  # "Waxing crescent"
     else:  # Waning
         if illumination > 0.55:
-            phase_name = "Vähenevä kupera kuu"  # Waning gibbous
+            phase_name = "Vähenevä kupera kuu"  # "Waning gibbous"
         elif illumination > 0.45:
-            phase_name = "Kuun viimeinen neljännes"  # Last quarter
+            phase_name = "Puolikuu (viimeinen neljännes)"  # "Last quarter"
         else:
-            phase_name = "Vähenevä sirppi"  # Waning crescent
+            phase_name = "Vähenevä sirppi"  # "Waning crescent"
 
     # Position for moon phase circle
     moon_indicator_x = text_x - 0.05
@@ -629,8 +625,7 @@ if show_info_text:
     moon_radius = 0.035
 
     # Draw dark gray base circle
-    ax.add_patch(plt.Circle((moon_indicator_x, moon_indicator_y), moon_radius, 
-                            fill=True, color='#404040', alpha=0.9, zorder=10))
+    ax.add_patch(plt.Circle((moon_indicator_x, moon_indicator_y), moon_radius, fill=True, color='#404040', alpha=0.9, zorder=10))
 
     # Draw illuminated part
     if illumination > 0.01:
@@ -654,8 +649,8 @@ if show_info_text:
             x_lit = np.concatenate([x_outer, x_terminator[::-1]])
             y_lit = np.concatenate([y_outer, y_terminator[::-1]])
             
-            ax.fill(x_lit, y_lit, color='white', alpha=0.9, zorder=11)
-            
+            ax.fill(x_lit, y_lit, color='white', alpha=0.9, zorder=11, linewidth=0)
+
         else:
             # Left side lit
             x_outer = moon_indicator_x - moon_radius * np.cos(theta)
@@ -674,11 +669,7 @@ if show_info_text:
             x_lit = np.concatenate([x_outer, x_terminator[::-1]])
             y_lit = np.concatenate([y_outer, y_terminator[::-1]])
             
-            ax.fill(x_lit, y_lit, color='white', alpha=0.9, zorder=11)
-
-    # Draw outline
-    ax.add_patch(plt.Circle((moon_indicator_x, moon_indicator_y), moon_radius, 
-                            fill=False, color='white', linewidth=0.1, zorder=12))
+            ax.fill(x_lit, y_lit, color='white', alpha=0.9, zorder=11, linewidth=0)
 
     # Search for next full moon (phase 180°) within next 30 days
     next_full_moon = SearchMoonPhase(180, utc, 30)

@@ -6,12 +6,12 @@
    id="Capa_1"
    x="0px"
    y="0px"
-   viewBox="0 0 35.045398 35.77"
+   viewBox="0 0 35.08596 35.602501"
    enable-background="new 0 0 1200 1200"
    xml:space="preserve"
-   width="35.045399"
-   height="35.77"
-   sodipodi:docname="mercury.svg"
+   width="35.08596"
+   height="35.602501"
+   sodipodi:docname="pluto.svg"
    inkscape:version="1.4.2 (f4327f4, 2025-05-13)"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
@@ -25,9 +25,9 @@
    inkscape:pageopacity="0"
    inkscape:pagecheckerboard="1"
    inkscape:deskcolor="#505050"
-   inkscape:zoom="0.024882573"
-   inkscape:cx="887388.12"
-   inkscape:cy="774598.34"
+   inkscape:zoom="29.997893"
+   inkscape:cx="17.551232"
+   inkscape:cy="17.80125"
    inkscape:window-width="2560"
    inkscape:window-height="1330"
    inkscape:window-x="-12"
@@ -37,7 +37,7 @@
    id="defs324" />
 <path
    fill="#253166"
-   d="m 17.522699,0 c -23.9399997,1.03 -22.7799997,35.02 0,35.77 23.94,-1.03 22.78,-35.03 0,-35.77 z"
-   id="path304"
-   style="fill:#ffffff" />
+   d="m 17.540169,35.6025 c 24.3225,-1.2975 22.4475,-34.995 0,-35.6025 -24.3150004,1.2975 -22.4400004,34.995 0,35.6025 z"
+   id="path305"
+   style="fill:#ffffff;stroke-width:0.75" />
 </svg>
