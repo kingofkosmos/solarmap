@@ -10,10 +10,15 @@ import numpy as np
 import datetime
 
 
-#Object additions
-#TODO: Comets (Halley, Hale-Bopp)
 
-#Visual customizations
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 1. TO-DO LIST
+# ═══════════════════════════════════════════════════════════════════════════
+
+#TODO: Astrology?
+#TODO: Weather info?
+#TODO: Comets (Halley, Hale-Bopp)
 #TODO: Arguments for command line usage
 #TODO: Planet labels working with different DPIs
 #TODO: Optional background stars
@@ -21,8 +26,11 @@ import datetime
 #TODO: Optional colors to background
 
 
-# CONFIGURATION VARIABLES
-# -----------------------------------------------
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 2. CONFIGURATION
+# ═══════════════════════════════════════════════════════════════════════════
 
 # Bottom right text toggle
 show_info_text = True  # Set to False to hide info text
@@ -57,9 +65,12 @@ planet_colors = {
     'Pluto':    '#A0826D'
 }
 
-# -----------------------------------------------
 
 
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 3. PLANET POSITION CALCULATIONS
+# ═══════════════════════════════════════════════════════════════════════════
 
 # Planet list
 planets = [Body.Mercury, Body.Venus, Body.Earth, Body.Mars,
@@ -105,9 +116,11 @@ longitudes = {planet.name: EclipticLongitude(planet, utc) for planet in planets}
 
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# 4. CANVAS INITIALIZATION
+# ═══════════════════════════════════════════════════════════════════════════
 
-# Canvas setup
-#   Set wallpaper resolution
+# Set wallpaper resolution
 width_px = 1920
 height_px = 1080
 
@@ -131,9 +144,11 @@ cy = cy + cy_offset
 
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# 5. BACKGROUND STARS
+# ═══════════════════════════════════════════════════════════════════════════
 
-# Background stars
-#   Calculate aspect-aware limits for stars
+# Calculate aspect-aware limits for stars
 fig_width, fig_height = fig.get_size_inches()
 aspect = fig_width / fig_height
 if aspect > 1:  # Wider than tall
@@ -143,18 +158,18 @@ else:  # Taller than wide
     star_xlim = (-1.3, 1.3)
     star_ylim = (-1.3 / aspect, 1.3 / aspect)
 
-#   Generate stars
+# Generate stars
 import numpy as np
 np.random.seed(12345)
 
-#   Base stars
+# Base stars
 num_stars = 200
 star_x = np.random.uniform(star_xlim[0], star_xlim[1], num_stars)
 star_y = np.random.uniform(star_ylim[0], star_ylim[1], num_stars)
 star_sizes = np.random.uniform(0.1, 1.5, num_stars)
 ax.scatter(star_x, star_y, s=star_sizes, c='white', alpha=0.3, marker='.')
 
-#   Dense band
+# Dense band
 band_stars = 1000
 band_x = np.random.uniform(star_xlim[0], star_xlim[1], band_stars)
 band_y = np.random.normal(0, 0.3, band_stars)
@@ -163,6 +178,10 @@ ax.scatter(band_x, band_y, s=band_sizes, c='white', alpha=0.2, marker='.')
 
 
 
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 6. PLANETARY RINGS AND RADII
+# ═══════════════════════════════════════════════════════════════════════════
 
 # Rings
 rings = []
@@ -185,20 +204,23 @@ for i, r in enumerate(rings[:-1]):  # All rings except the last one (Pluto)
 ax.add_patch(
     plt.Circle((cx, cy), rings[-1], fill=False, linewidth=0.4, color='white', linestyle=(0, (10, 10)), alpha=0.2))
 
-#   Radii for each planet
+# Radii for each planet
 planet_radii = {p.name: rings[i] for i, p in enumerate(planets)}
 
 
 
 
-# Plot objects
-#   Sun
+# ═══════════════════════════════════════════════════════════════════════════
+# 7. PLOTTING PLANETS AND OBJECTS
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Sun
 sun_color = planet_colors['Sun'] if use_colors else None
 sun_imagebox = svg_to_imagebox("icons/sun.svg", zoom=0.3, color=sun_color)
 sun_ab = AnnotationBbox(sun_imagebox, (cx, cy), frameon=False)
 ax.add_artist(sun_ab)
 
-#   Planets
+# Planets and Dwarf Planets
 for name, L in longitudes.items():
     L = L % 360
     theta_deg = 0 - L
@@ -207,11 +229,11 @@ for name, L in longitudes.items():
     x = cx + r * math.cos(theta)
     y = cy + r * math.sin(theta)
 
-#   (Store Earth's position for Moon plotting)
+# (Store Earth's position for Moon plotting)
     if name == "Earth":
         earth_x, earth_y = x, y
 
-#   Plot planet icons
+# Plot planet icons
     svg_path = f"icons/{name.lower()}.svg"
     
     # Set zoom level (custom for Pluto)
@@ -249,17 +271,29 @@ for name, L in longitudes.items():
         ab = AnnotationBbox(imagebox, (x, y), frameon=False)
         ax.add_artist(ab)
 
+    # Ceres (in asteroid belt)
+    ceres_L, ceres_theta = calculate_dwarf_planet('Ceres', 2.77, 1680)
+    ceres_r = (mars_r + jupiter_r) / 2  # Middle of asteroid belt
+    ceres_x = cx + ceres_r * math.cos(ceres_theta)
+    ceres_y = cy + ceres_r * math.sin(ceres_theta)
+
+    ceres_imagebox = svg_to_imagebox("icons/pluto.svg", zoom=0.1, color='#A0826D' if use_colors else None)
+    ax.add_artist(AnnotationBbox(ceres_imagebox, (ceres_x, ceres_y), frameon=False))
 
 
 
-# Asteroids
-#   Asteroid belt between Mars and Jupiter
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 8. ASTEROIDS
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Asteroid belt between Mars and Jupiter
 mars_r = planet_radii['Mars']
 jupiter_r = planet_radii['Jupiter']
 asteroid_belt_inner = mars_r + (jupiter_r - mars_r) * 0.1
 asteroid_belt_outer = mars_r + (jupiter_r - mars_r) * 0.9
 
-#   Generate asteroids
+# Generate asteroids
 np.random.seed(123)
 num_asteroids = 6000
 asteroid_angles = np.random.uniform(0, 2 * np.pi, num_asteroids)
@@ -294,24 +328,16 @@ ax.scatter(asteroid_x, asteroid_y, s=asteroid_sizes, c='white', alpha=asteroid_a
 
 
 
-# Ceres (in asteroid belt)
-ceres_L, ceres_theta = calculate_dwarf_planet('Ceres', 2.77, 1680)
-ceres_r = (mars_r + jupiter_r) / 2  # Middle of asteroid belt
-ceres_x = cx + ceres_r * math.cos(ceres_theta)
-ceres_y = cy + ceres_r * math.sin(ceres_theta)
+# ═══════════════════════════════════════════════════════════════════════════
+# 8.1 KUIPER BELT
+# ═══════════════════════════════════════════════════════════════════════════
 
-ceres_imagebox = svg_to_imagebox("icons/pluto.svg", zoom=0.1, color='#A0826D' if use_colors else None)
-ax.add_artist(AnnotationBbox(ceres_imagebox, (ceres_x, ceres_y), frameon=False))
-
-
-
-
-#   Kuiper belt beyond Neptune
+# Ranges for Kuiper belt
 neptune_r = planet_radii['Neptune']
 kuiper_inner = neptune_r * 1.05
 kuiper_outer = neptune_r * 1.5
 
-#   Generate Kuiper belt objects
+# Generate Kuiper belt objects
 num_kuiper = 10000
 kuiper_angles = np.random.uniform(0, 2 * np.pi, num_kuiper)
 kuiper_radii = np.random.uniform(kuiper_inner, kuiper_outer, num_kuiper)
@@ -325,13 +351,20 @@ kuiper_x = cx + kuiper_radii * np.cos(rotated_kuiper_angles)
 kuiper_y = cy + kuiper_radii * np.sin(rotated_kuiper_angles)
 kuiper_sizes = np.random.uniform(0.03, 0.25, num_kuiper)
 
-#   Fade alpha based on distance
+# Fade alpha based on distance
 kuiper_alphas = 1.0 - (kuiper_radii - kuiper_inner) / (kuiper_outer - kuiper_inner)
 kuiper_alphas *= 0.3
 
-#   Single scatter call with alpha array
+# Single scatter call with alpha array
 ax.scatter(kuiper_x, kuiper_y, s=kuiper_sizes, c='white', 
            alpha=kuiper_alphas, marker='.')
+
+
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 8.2 JUPITER TROJANS
+# ═══════════════════════════════════════════════════════════════════════════
 
 # Jupiter Trojans - get Jupiter's position
 jupiter_r = planet_radii['Jupiter']
@@ -371,6 +404,10 @@ trojan_cloud(jupiter_r, jupiter_L, -60)   # L5
 
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# 9. JUPITER'S AND EARTH'S MOONS
+# ═══════════════════════════════════════════════════════════════════════════
+
 # Jupiter's moon rings
 jupiter_L = longitudes['Jupiter'] % 360
 jupiter_theta_deg = 0 - jupiter_L
@@ -407,11 +444,11 @@ for moon_name, moon_vec in moon_data.items():
     ax.add_artist(ab)
 
 # Earth's Moon
-#     Moon ring
+# Moon ring
 moon_ring_size = 250 # To keep Moon ring consistent across DPIs
 earth_ring_r = 0.06  # adjust visually
 
-#     Moon's position relative to Earth
+# Moon's position relative to Earth
 moon_vec = GeoVector(Body.Moon, utc, True)
 moon_angle = math.degrees(math.atan2(moon_vec.y, moon_vec.x))
 moon_theta_deg = 0 - moon_angle
@@ -419,13 +456,21 @@ moon_theta = math.radians(-moon_theta_deg)
 moon_x = earth_x + earth_ring_r * math.cos(moon_theta)
 moon_y = earth_y + earth_ring_r * math.sin(moon_theta)
 
-#     Plot Moon icon
+# Plot Moon icon
 moon_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.08)
 moon_ab = AnnotationBbox(moon_imagebox, (moon_x, moon_y), frameon=False)
 ax.add_artist(moon_ab)
 
 
 
+
+
+
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 11. ORBITAL TRAILS
+# ═══════════════════════════════════════════════════════════════════════════
 
 # Orbital trails
 if show_trails:
@@ -547,13 +592,14 @@ if show_trails:
                    color=jupiter_moon_color, alpha=alphas[i], linewidth=0.8)
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# 12. CANVAS FINALIZATION
+# ═══════════════════════════════════════════════════════════════════════════
 
-
-# Canvas setup
-#   Limits and aspect
+# Limits and aspect
 ax.set_aspect('equal', 'box')
 
-#   Calculate axis limits
+# Calculate axis limits
 fig_width, fig_height = fig.get_size_inches()
 aspect = fig_width / fig_height
 
@@ -569,7 +615,10 @@ ax.axis('off')
 
 
 
-# Bottom right text
+# ═══════════════════════════════════════════════════════════════════════════
+# 13. BOTTOM RIGHT INFO
+# ═══════════════════════════════════════════════════════════════════════════
+
 if show_info_text:
     # Calculate text position (bottom right with taskbar offset)
     fig_width, fig_height = fig.get_size_inches()
@@ -621,6 +670,10 @@ if show_info_text:
 
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# 13.1 MOON PHASE
+# ═══════════════════════════════════════════════════════════════════════════
+
     # Get moon phase info
     illum = Illumination(Body.Moon, utc)
     phase_angle = illum.phase_angle
@@ -652,8 +705,8 @@ if show_info_text:
             phase_name = "Vähenevä sirppi"  # "Waning crescent"
 
     # Position for moon phase circle
-    moon_indicator_x = text_x - 0.05
-    moon_indicator_y = text_y + 0.3
+    moon_indicator_x = text_x - 0.04
+    moon_indicator_y = text_y + 0.265
     moon_radius = 0.035
 
     # Draw dark gray base circle
@@ -710,6 +763,10 @@ if show_info_text:
 
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# 13.2 PLOT INFO TEXT
+# ═══════════════════════════════════════════════════════════════════════════
+
     # Plot text
     info_text = (
         f"{phase_name}\n"
@@ -726,6 +783,10 @@ if show_info_text:
 
 
 
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 14. FINALIZE AND SAVE IMAGE
+# ═══════════════════════════════════════════════════════════════════════════
 
 # Save and show
 plt.tight_layout()
