@@ -82,6 +82,14 @@ def svg_to_imagebox(svg_path, zoom=0.1, color=None):
 
     return OffsetImage(image, zoom=zoom)
 
+def calculate_dwarf_planet(name, semi_major_axis_au, orbital_period_days, ref_longitude=0):
+    """Calculate position of a dwarf planet using simple orbital mechanics."""
+    ref_epoch = Time.Make(2000, 1, 1, 0, 0, 0)
+    days_since_epoch = utc.ut - ref_epoch.ut
+    mean_motion = 360 / orbital_period_days
+    L = (ref_longitude + mean_motion * days_since_epoch) % 360
+    theta = math.radians(-(0 - L))
+    return L, theta
 
 
 
@@ -169,9 +177,13 @@ rings.append(current) # Ring 5
 for _ in range(5, 9): # Rings 6 to 9
     current += step
     rings.append(current)
-for r in rings: # Draw rings, dashed lines
+for i, r in enumerate(rings[:-1]):  # All rings except the last one (Pluto)
     ax.add_patch(
         plt.Circle((cx, cy), r, fill=False, linewidth=0.4, color='white', linestyle=(0, (10, 10))))
+
+# Draw Pluto's ring with 50% less alpha
+ax.add_patch(
+    plt.Circle((cx, cy), rings[-1], fill=False, linewidth=0.4, color='white', linestyle=(0, (10, 10)), alpha=0.2))
 
 #   Radii for each planet
 planet_radii = {p.name: rings[i] for i, p in enumerate(planets)}
@@ -202,10 +214,13 @@ for name, L in longitudes.items():
 #   Plot planet icons
     svg_path = f"icons/{name.lower()}.svg"
     
+    # Set zoom level (custom for Pluto)
+    zoom = 0.1 if name == "Pluto" else 0.2
+
     # Special handling for Earth to add green landmasses
     if name == "Earth" and use_colors:
         # Plot blue ocean base
-        imagebox = svg_to_imagebox(svg_path, zoom=0.2, color='#4A90E2')
+        imagebox = svg_to_imagebox(svg_path, zoom=zoom, color='#4A90E2')
         ab = AnnotationBbox(imagebox, (x, y), frameon=False)
         ax.add_artist(ab)
         
@@ -225,12 +240,12 @@ for name, L in longitudes.items():
             land_image[:, :, i] = np.where(black_mask, green_rgb[i], 0)
         land_image[:, :, 3] = np.where(black_mask, image[:, :, 3], 0)  # Preserve alpha only for land
         
-        land_imagebox = OffsetImage(land_image, zoom=0.2)
+        land_imagebox = OffsetImage(land_image, zoom=zoom)
         land_ab = AnnotationBbox(land_imagebox, (x, y), frameon=False)
         ax.add_artist(land_ab)
     else:
         color = planet_colors.get(name) if use_colors else None
-        imagebox = svg_to_imagebox(svg_path, zoom=0.2, color=color)
+        imagebox = svg_to_imagebox(svg_path, zoom=zoom, color=color)
         ab = AnnotationBbox(imagebox, (x, y), frameon=False)
         ax.add_artist(ab)
 
@@ -275,6 +290,18 @@ asteroid_alphas[fade_in_mask] = (normalized_pos[fade_in_mask] / 0.2) * 0.4
 asteroid_alphas[fade_out_mask] = (1 - (normalized_pos[fade_out_mask] - 0.6) / 0.4) * 0.4
 
 ax.scatter(asteroid_x, asteroid_y, s=asteroid_sizes, c='white', alpha=asteroid_alphas, marker='.')
+
+
+
+
+# Ceres (in asteroid belt)
+ceres_L, ceres_theta = calculate_dwarf_planet('Ceres', 2.77, 1680)
+ceres_r = (mars_r + jupiter_r) / 2  # Middle of asteroid belt
+ceres_x = cx + ceres_r * math.cos(ceres_theta)
+ceres_y = cy + ceres_r * math.sin(ceres_theta)
+
+ceres_imagebox = svg_to_imagebox("icons/pluto.svg", zoom=0.1, color='#A0826D' if use_colors else None)
+ax.add_artist(AnnotationBbox(ceres_imagebox, (ceres_x, ceres_y), frameon=False))
 
 
 
@@ -417,6 +444,11 @@ if show_trails:
     
     for planet in planets:
         name = planet.name
+
+        # Skip Pluto's trail
+        if name == 'Pluto':
+            continue
+
         r = planet_radii.get(name, 1)
         
         # Calculate current position
