@@ -271,15 +271,6 @@ for name, L in longitudes.items():
         ab = AnnotationBbox(imagebox, (x, y), frameon=False)
         ax.add_artist(ab)
 
-    # Ceres (in asteroid belt)
-    ceres_L, ceres_theta = calculate_dwarf_planet('Ceres', 2.77, 1680)
-    ceres_r = (mars_r + jupiter_r) / 2  # Middle of asteroid belt
-    ceres_x = cx + ceres_r * math.cos(ceres_theta)
-    ceres_y = cy + ceres_r * math.sin(ceres_theta)
-
-    ceres_imagebox = svg_to_imagebox("icons/pluto.svg", zoom=0.1, color='#A0826D' if use_colors else None)
-    ax.add_artist(AnnotationBbox(ceres_imagebox, (ceres_x, ceres_y), frameon=False))
-
 
 
 
@@ -405,7 +396,7 @@ trojan_cloud(jupiter_r, jupiter_L, -60)   # L5
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 9. JUPITER'S AND EARTH'S MOONS
+# 9. JUPITER'S MOONS, EARTH'S MOON AND CERES
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Jupiter's moon rings
@@ -461,15 +452,20 @@ moon_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.08)
 moon_ab = AnnotationBbox(moon_imagebox, (moon_x, moon_y), frameon=False)
 ax.add_artist(moon_ab)
 
+# Ceres (in asteroid belt)
+ceres_L, ceres_theta = calculate_dwarf_planet('Ceres', 2.77, 1680)
+ceres_r = (mars_r + jupiter_r) / 2  # Middle of asteroid belt
+ceres_x = cx + ceres_r * math.cos(ceres_theta)
+ceres_y = cy + ceres_r * math.sin(ceres_theta)
 
-
-
+ceres_imagebox = svg_to_imagebox("icons/pluto.svg", zoom=0.1, color='#A0826D' if use_colors else None)
+ax.add_artist(AnnotationBbox(ceres_imagebox, (ceres_x, ceres_y), frameon=False))
 
 
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 11. ORBITAL TRAILS
+# 10. ORBITAL TRAILS
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Orbital trails
@@ -593,7 +589,7 @@ if show_trails:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 12. CANVAS FINALIZATION
+# 11. CANVAS FINALIZATION
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Limits and aspect
@@ -616,7 +612,7 @@ ax.axis('off')
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 13. BOTTOM RIGHT INFO
+# 12. BOTTOM RIGHT INFO
 # ═══════════════════════════════════════════════════════════════════════════
 
 if show_info_text:
@@ -671,7 +667,7 @@ if show_info_text:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 13.1 MOON PHASE
+# 12.1 MOON PHASE
 # ═══════════════════════════════════════════════════════════════════════════
 
     # Get moon phase info
@@ -764,7 +760,7 @@ if show_info_text:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 13.2 PLOT INFO TEXT
+# 12.2 PLOT INFO TEXT
 # ═══════════════════════════════════════════════════════════════════════════
 
     # Plot text
@@ -785,7 +781,7 @@ if show_info_text:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 14. FINALIZE AND SAVE IMAGE
+# 13. FINALIZE AND SAVE IMAGE
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Save and show
