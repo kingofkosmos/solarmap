@@ -286,7 +286,7 @@ asteroid_belt_outer = mars_r + (jupiter_r - mars_r) * 0.9
 
 # Generate asteroids
 np.random.seed(123)
-num_asteroids = 6000
+num_asteroids = 7000
 asteroid_angles = np.random.uniform(0, 2 * np.pi, num_asteroids)
 asteroid_radii = np.random.uniform(asteroid_belt_inner, asteroid_belt_outer, num_asteroids)
 
@@ -314,7 +314,15 @@ fade_out_mask = normalized_pos > 0.5
 asteroid_alphas[fade_in_mask] = (normalized_pos[fade_in_mask] / 0.2) * 0.4
 asteroid_alphas[fade_out_mask] = (1 - (normalized_pos[fade_out_mask] - 0.6) / 0.4) * 0.4
 
-ax.scatter(asteroid_x, asteroid_y, s=asteroid_sizes, c='white', alpha=asteroid_alphas, marker='.')
+# Generate color variation for asteroids
+if use_colors:
+    base_color = np.array([168, 152, 128]) / 255  # #A89880 in RGB
+    color_variation = np.random.uniform(-0.2, 0.2, (num_asteroids, 3))
+    asteroid_colors = np.clip(base_color + color_variation, 0, 1)
+else:
+    asteroid_colors = 'white'
+
+ax.scatter(asteroid_x, asteroid_y, s=asteroid_sizes, c=asteroid_colors, alpha=asteroid_alphas, marker='.')
 
 
 
@@ -329,7 +337,7 @@ kuiper_inner = neptune_r * 1.05
 kuiper_outer = neptune_r * 1.5
 
 # Generate Kuiper belt objects
-num_kuiper = 10000
+num_kuiper = 6000
 kuiper_angles = np.random.uniform(0, 2 * np.pi, num_kuiper)
 kuiper_radii = np.random.uniform(kuiper_inner, kuiper_outer, num_kuiper)
 
@@ -344,10 +352,17 @@ kuiper_sizes = np.random.uniform(0.03, 0.25, num_kuiper)
 
 # Fade alpha based on distance
 kuiper_alphas = 1.0 - (kuiper_radii - kuiper_inner) / (kuiper_outer - kuiper_inner)
-kuiper_alphas *= 0.3
+kuiper_alphas *= 0.8
 
-# Single scatter call with alpha array
-ax.scatter(kuiper_x, kuiper_y, s=kuiper_sizes, c='white', 
+# Generate color variation for Kuiper belt
+if use_colors:
+    base_color = np.array([149, 165, 181]) / 255  # #95A5B5 in RGB
+    color_variation = np.random.uniform(-0.2, 0.2, (num_kuiper, 3))
+    kuiper_colors = np.clip(base_color + color_variation, 0, 1)
+else:
+    kuiper_colors = 'white'
+
+ax.scatter(kuiper_x, kuiper_y, s=kuiper_sizes, c=kuiper_colors, 
            alpha=kuiper_alphas, marker='.')
 
 
@@ -387,7 +402,7 @@ def trojan_cloud(jupiter_r, jupiter_L, offset_deg, n=700):
     y = cy + rr * np.sin(theta)
     size = np.random.uniform(0.05, 0.2, n)
 
-    ax.scatter(x, y, s=size, c='white', alpha=0.35, marker='.')
+    ax.scatter(x, y, s=size, c='#8B6F47' if use_colors else 'white', alpha=0.35, marker='.')
 
 trojan_cloud(jupiter_r, jupiter_L, +60)   # L4
 trojan_cloud(jupiter_r, jupiter_L, -60)   # L5
@@ -421,7 +436,13 @@ moon_data = {
     'Callisto': jm.callisto
 }
 
-jupiter_moon_color = '#C88B3A' if use_colors else 'white'
+# Realistic colors for Jupiter's moons
+jupiter_moon_colors = {
+    'Io': '#F4D03F',        # Sulfur yellow
+    'Europa': '#D4C5B0',    # Pale tan/cream (ice)
+    'Ganymede': '#8B7E66',  # Gray-brown
+    'Callisto': '#4A4A4A'   # Dark gray
+}
 
 for moon_name, moon_vec in moon_data.items():
     angle = math.degrees(math.atan2(moon_vec.y, moon_vec.x))
@@ -430,7 +451,9 @@ for moon_name, moon_vec in moon_data.items():
     x = jupiter_x + r * math.cos(theta)
     y = jupiter_y + r * math.sin(theta)
 
-    imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.08, color=jupiter_moon_color)
+    moon_color = jupiter_moon_colors[moon_name] if use_colors else 'white'
+    
+    imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.08, color=moon_color)
     ab = AnnotationBbox(imagebox, (x, y), frameon=False)
     ax.add_artist(ab)
 
@@ -553,7 +576,7 @@ if show_trails:
 if show_trails:
     # Arc fraction lengths for each moon
     arc_fractions = {
-        'Io': 1/3,
+        'Io': 1/4,
         'Europa': 1/5,
         'Ganymede': 1/8,
         'Callisto': 1/10
@@ -579,13 +602,14 @@ if show_trails:
         arc_x = jupiter_x + r * np.cos(theta_range)
         arc_y = jupiter_y + r * np.sin(theta_range)
         
-        # Plot with fading alpha
+        # Plot with fading alpha - use individual moon color
         alphas = np.linspace(0.6, 0, len(theta_range))
-        
+        trail_color = jupiter_moon_colors[moon_name] if use_colors else 'white'
+            
         for i in range(len(arc_x) - 1):
             ax.plot([arc_x[i], arc_x[i+1]], 
                    [arc_y[i], arc_y[i+1]], 
-                   color=jupiter_moon_color, alpha=alphas[i], linewidth=0.8)
+                   color=trail_color, alpha=alphas[i], linewidth=0.8)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
