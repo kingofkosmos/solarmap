@@ -53,7 +53,7 @@ use_colors = True # Set to False for black & white
 
 # Planet colors
 planet_colors = {
-    'Sun':      '#FFD700',
+    'Sun':      '#FFF75E',
     'Mercury':  '#815313',
     'Venus':    '#3CB371',
     'Earth':    '#4A90E2',
@@ -125,7 +125,7 @@ width_px = 1920
 height_px = 1080
 
 reference_height = 1440
-reference_dpi = 150 # Reference DPI for scaling, change for bigger/smaller planets and stars
+reference_dpi = 100 # Reference DPI for scaling, change for bigger/smaller planets and stars
 dpi = int(height_px * (reference_dpi / reference_height))
 
 fig, ax = plt.subplots(figsize=(1, 1))
@@ -167,14 +167,14 @@ num_stars = 200
 star_x = np.random.uniform(star_xlim[0], star_xlim[1], num_stars)
 star_y = np.random.uniform(star_ylim[0], star_ylim[1], num_stars)
 star_sizes = np.random.uniform(0.1, 1.5, num_stars)
-ax.scatter(star_x, star_y, s=star_sizes, c='white', alpha=0.3, marker='.')
+ax.scatter(star_x, star_y, s=star_sizes, c='white', alpha=0.4, marker='.')
 
 # Dense band
 band_stars = 1000
 band_x = np.random.uniform(star_xlim[0], star_xlim[1], band_stars)
 band_y = np.random.normal(0, 0.3, band_stars)
 band_sizes = np.random.uniform(0.05, 0.8, band_stars)
-ax.scatter(band_x, band_y, s=band_sizes, c='white', alpha=0.2, marker='.')
+ax.scatter(band_x, band_y, s=band_sizes, c='white', alpha=0.3, marker='.')
 
 
 
@@ -202,7 +202,7 @@ for i, r in enumerate(rings[:-1]):  # All rings except the last one (Pluto)
 
 # Draw Pluto's ring with 50% less alpha
 ax.add_patch(
-    plt.Circle((cx, cy), rings[-1], fill=False, linewidth=0.4, color='white', linestyle=(0, (10, 10)), alpha=0.2))
+    plt.Circle((cx, cy), rings[-1], fill=False, linewidth=0.4, color='white', linestyle=(0, (10, 10)), alpha=0))
 
 # Radii for each planet
 planet_radii = {p.name: rings[i] for i, p in enumerate(planets)}
@@ -216,7 +216,7 @@ planet_radii = {p.name: rings[i] for i, p in enumerate(planets)}
 
 # Sun
 sun_color = planet_colors['Sun'] if use_colors else None
-sun_imagebox = svg_to_imagebox("icons/sun.svg", zoom=0.3, color=sun_color)
+sun_imagebox = svg_to_imagebox("icons/sun.svg", zoom=0.4, color=sun_color)
 sun_ab = AnnotationBbox(sun_imagebox, (cx, cy), frameon=False)
 ax.add_artist(sun_ab)
 
@@ -237,7 +237,7 @@ for name, L in longitudes.items():
     svg_path = f"icons/{name.lower()}.svg"
     
     # Set zoom level (custom for Pluto)
-    zoom = 0.1 if name == "Pluto" else 0.2
+    zoom = 0.11 if name == "Pluto" else 0.3
 
     # Special handling for Earth to add green landmasses
     if name == "Earth" and use_colors:
@@ -453,12 +453,11 @@ for moon_name, moon_vec in moon_data.items():
 
     moon_color = jupiter_moon_colors[moon_name] if use_colors else 'white'
     
-    imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.08, color=moon_color)
+    imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.11, color=moon_color)
     ab = AnnotationBbox(imagebox, (x, y), frameon=False)
     ax.add_artist(ab)
 
-# Earth's Moon
-# Moon ring
+# Earth's Moon ring
 moon_ring_size = 250 # To keep Moon ring consistent across DPIs
 earth_ring_r = 0.06  # adjust visually
 
@@ -470,18 +469,18 @@ moon_theta = math.radians(-moon_theta_deg)
 moon_x = earth_x + earth_ring_r * math.cos(moon_theta)
 moon_y = earth_y + earth_ring_r * math.sin(moon_theta)
 
-# Plot Moon icon
-moon_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.08)
+# Plot Moon
+moon_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.12)
 moon_ab = AnnotationBbox(moon_imagebox, (moon_x, moon_y), frameon=False)
 ax.add_artist(moon_ab)
 
-# Ceres (in asteroid belt)
+# Ceres
 ceres_L, ceres_theta = calculate_dwarf_planet('Ceres', 2.77, 1680)
 ceres_r = (mars_r + jupiter_r) / 2  # Middle of asteroid belt
 ceres_x = cx + ceres_r * math.cos(ceres_theta)
 ceres_y = cy + ceres_r * math.sin(ceres_theta)
 
-ceres_imagebox = svg_to_imagebox("icons/pluto.svg", zoom=0.1, color='#A0826D' if use_colors else None)
+ceres_imagebox = svg_to_imagebox("icons/pluto.svg", zoom=0.11, color='#A0826D' if use_colors else None)
 ax.add_artist(AnnotationBbox(ceres_imagebox, (ceres_x, ceres_y), frameon=False))
 
 
@@ -645,10 +644,10 @@ if show_info_text:
     aspect = fig_width / fig_height
 
     if aspect > 1:
-        text_x = 1.3 * aspect - 0.05
-        text_y = -1.3 + (taskbar_offset * 2.6) + 0.1
+        text_x = 1.3 * aspect - 0.07
+        text_y = -1.2 + (taskbar_offset * 2.6)
     else:
-        text_x = 1.3 - 0.05
+        text_x = 1.3 - 0.07
         text_y = (-1.3 / aspect) + (taskbar_offset * 2.6) + 0.1
 
     # Geolocation coordinates
@@ -726,7 +725,7 @@ if show_info_text:
 
     # Position for moon phase circle
     moon_indicator_x = text_x - 0.04
-    moon_indicator_y = text_y + 0.265
+    moon_indicator_y = text_y + 0.24
     moon_radius = 0.035
 
     # Draw dark gray base circle
@@ -797,7 +796,7 @@ if show_info_text:
     )
 
     ax.text(text_x, text_y, info_text,
-            color='white', fontsize=10,
+            color='white', fontsize=12,
             ha='right', va='bottom',
             alpha=0.7)
 
