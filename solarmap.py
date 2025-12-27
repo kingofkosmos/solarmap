@@ -411,8 +411,54 @@ trojan_cloud(jupiter_r, jupiter_L, -60)   # L5
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 9. JUPITER'S MOONS, EARTH'S MOON AND CERES
+# 9. JUPITER'S MOONS, MARS'S MOONS, EARTH'S MOON AND CERES
 # ═══════════════════════════════════════════════════════════════════════════
+
+# Mars's moons
+mars_L = longitudes['Mars'] % 360
+mars_theta_deg = 0 - mars_L
+mars_theta = math.radians(-mars_theta_deg)
+mars_r = planet_radii['Mars']
+mars_x = cx + mars_r * math.cos(mars_theta)
+mars_y = cy + mars_r * math.sin(mars_theta)
+
+# Orbital data from HORIZONS (epoch: 2025-01-01 00:00 UTC)
+phobos_epoch_angle = 0.866680
+phobos_period = 0.319
+phobos_orbit_r = 0.035
+
+deimos_epoch_angle = 0.017910
+deimos_period = 1.263
+deimos_orbit_r = 0.04
+
+epoch_date = 2460676.5  # Julian date
+days_since_epoch = utc.ut - epoch_date
+
+phobos_angle = (phobos_epoch_angle + days_since_epoch / phobos_period * 360) % 360
+deimos_angle = (deimos_epoch_angle + days_since_epoch / deimos_period * 360) % 360
+
+phobos_theta = math.radians(-(0 - phobos_angle))
+deimos_theta = math.radians(-(0 - deimos_angle))
+
+phobos_x = mars_x + phobos_orbit_r * math.cos(phobos_theta)
+phobos_y = mars_y + phobos_orbit_r * math.sin(phobos_theta)
+
+deimos_x = mars_x + deimos_orbit_r * math.cos(deimos_theta)
+deimos_y = mars_y + deimos_orbit_r * math.sin(deimos_theta)
+
+mars_moon_colors = {
+    'Phobos': '#8B7355',  # Dark brown-gray
+    'Deimos': '#A89880'   # Light brown-gray
+}
+
+phobos_color = mars_moon_colors['Phobos'] if use_colors else 'white'
+deimos_color = mars_moon_colors['Deimos'] if use_colors else 'white'
+
+phobos_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.12, color=phobos_color)
+deimos_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.12, color=deimos_color)
+
+ax.add_artist(AnnotationBbox(phobos_imagebox, (phobos_x, phobos_y), frameon=False))
+ax.add_artist(AnnotationBbox(deimos_imagebox, (deimos_x, deimos_y), frameon=False))
 
 # Jupiter's moon rings
 jupiter_L = longitudes['Jupiter'] % 360
@@ -570,6 +616,45 @@ if show_trails:
         ax.plot([arc_x[i], arc_x[i+1]], 
                [arc_y[i], arc_y[i+1]], 
                color='white', alpha=alphas[i], linewidth=1.0)
+
+# Mars moons trails
+if show_trails:
+    # Arc fractions for Mars moons
+    mars_arc_fractions = {
+        'Phobos': 1/2,
+        'Deimos': 1/3
+    }
+    
+    for moon_name, orbit_r in [('Phobos', phobos_orbit_r), ('Deimos', deimos_orbit_r)]:
+        # Get current angle
+        if moon_name == 'Phobos':
+            current_angle = phobos_angle
+        else:
+            current_angle = deimos_angle
+        
+        current_theta_deg = 0 - current_angle
+        
+        # Calculate arc span
+        arc_span = 360 * mars_arc_fractions[moon_name]
+        
+        # Create arc from current position backwards
+        theta_start = math.radians(-current_theta_deg)
+        theta_end = math.radians(-(current_theta_deg + arc_span))
+        
+        # Generate arc points
+        theta_range = np.linspace(theta_start, theta_end, 50)
+        
+        arc_x = mars_x + orbit_r * np.cos(theta_range)
+        arc_y = mars_y + orbit_r * np.sin(theta_range)
+        
+        # Plot with fading alpha
+        alphas = np.linspace(0.6, 0, len(theta_range))
+        trail_color = mars_moon_colors[moon_name] if use_colors else 'white'
+        
+        for i in range(len(arc_x) - 1):
+            ax.plot([arc_x[i], arc_x[i+1]], 
+                   [arc_y[i], arc_y[i+1]], 
+                   color=trail_color, alpha=alphas[i], linewidth=0.7)
 
 # Jupiter moons trails
 if show_trails:
