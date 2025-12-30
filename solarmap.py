@@ -895,23 +895,31 @@ if show_info_text:
 # Save and show
 plt.tight_layout()
 
-# Render at larger size to avoid edge clipping
-overscan = 1.05  # 5 % extra on each side
-temp_dpi = int(dpi * overscan)
-fig.savefig("temp_overscan.png", dpi=temp_dpi)
+# Supersample entire image for antialiasing with overscan
+supersample_final = 4  # Render at 4x resolution
+overscan = 1.04  # 4 % extra on each side
+temp_dpi = int(dpi * supersample_final * overscan)
 
-# Crop to exact size
+# Save at high resolution with overscan
+fig.savefig("temp_supersampled.png", dpi=temp_dpi)
+
+# Crop and downsample to final size
 from PIL import Image
-img = Image.open("temp_overscan.png")
+img = Image.open("temp_supersampled.png")
 w, h = img.size
-crop_w = int(width_px)
-crop_h = int(height_px)
+
+# Calculate crop area (remove overscan)
+crop_w = int(width_px * supersample_final)
+crop_h = int(height_px * supersample_final)
 left = (w - crop_w) // 2
 top = (h - crop_h) // 2
 cropped = img.crop((left, top, left + crop_w, top + crop_h))
-cropped.save("solarmap.png")
+
+# Downsample to final size with high-quality resampling
+final_img = cropped.resize((width_px, height_px), Image.LANCZOS)
+final_img.save("solarmap.png")
 
 import os
-os.remove("temp_overscan.png")
+os.remove("temp_supersampled.png")
 
 plt.show()
