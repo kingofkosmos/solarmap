@@ -17,7 +17,21 @@ import datetime
 # ═══════════════════════════════════════════════════════════════════════════
 
 #TODO: Astrology?
+##      Sky division to constellations
+##      Meanings of planets in different constellations?
+#TODO: Next biggest missing objects:
+##      Titan (Saturn)
+##      Triton (Neptune)
+##      Eris
+##      Titania (Uranus)
+##      Haumea
+##      Rhea (Saturn)
+##      Oberon (Uranus)
+##      Iapetus (Saturn)
+##      Makemake
 #TODO: Weather info?
+##      Previous day temperature average
+##      Forecast high/low for next day
 #TODO: Comets (Halley, Hale-Bopp)
 #TODO: Arguments for command line usage
 #TODO: Planet labels working with different DPIs
@@ -159,7 +173,6 @@ else:  # Taller than wide
     star_ylim = (-1.3 / aspect, 1.3 / aspect)
 
 # Generate stars
-import numpy as np
 np.random.seed(12345)
 
 # Base stars
@@ -900,12 +913,14 @@ supersample_final = 4  # Render at 4x resolution
 overscan = 1.04  # 4 % extra on each side
 temp_dpi = int(dpi * supersample_final * overscan)
 
-# Save at high resolution with overscan
-fig.savefig("temp_supersampled.png", dpi=temp_dpi)
-
-# Crop and downsample to final size
+# Save to memory buffer instead of file
 from PIL import Image
-img = Image.open("temp_supersampled.png")
+buffer = io.BytesIO()
+fig.savefig(buffer, format='png', dpi=temp_dpi)
+buffer.seek(0)
+
+# Load from buffer, crop and downsample
+img = Image.open(buffer)
 w, h = img.size
 
 # Calculate crop area (remove overscan)
@@ -919,7 +934,6 @@ cropped = img.crop((left, top, left + crop_w, top + crop_h))
 final_img = cropped.resize((width_px, height_px), Image.LANCZOS)
 final_img.save("solarmap.png")
 
-import os
-os.remove("temp_supersampled.png")
+buffer.close()
 
 plt.show()
