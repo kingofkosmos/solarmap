@@ -21,19 +21,20 @@ import datetime
 ##      Meanings of planets in different constellations?
 #TODO: Next biggest missing objects:
 ##      Titan (Saturn)
-##      Triton (Neptune)
-##      Eris
-##      Titania (Uranus)
-##      Haumea
-##      Rhea (Saturn)
-##      Oberon (Uranus)
 ##      Iapetus (Saturn)
+##      Rhea (Saturn)
+##      Titania (Uranus)
+##      Oberon (Uranus)
+##      Eris
+##      Haumea
 ##      Makemake
+#TODO: More realistic moon sizes?
 #TODO: Weather info?
 ##      Previous day temperature average
 ##      Forecast high/low for next day
 #TODO: Comets (Halley, Hale-Bopp)
 #TODO: Arguments for command line usage
+#TODO: Fix planet names not showing
 #TODO: Planet labels working with different DPIs
 #TODO: Optional background stars
 #TODO: Optional colors to rings
@@ -424,7 +425,7 @@ trojan_cloud(jupiter_r, jupiter_L, -60)   # L5
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 9. JUPITER'S MOONS, MARS'S MOONS, EARTH'S MOON AND CERES
+# 9. JUPITER'S MOONS, MARS'S MOONS, EARTH'S MOON, NEPTUNE'S MOON AND CERES
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Mars's moons
@@ -532,6 +533,38 @@ moon_y = earth_y + earth_ring_r * math.sin(moon_theta)
 moon_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.12)
 moon_ab = AnnotationBbox(moon_imagebox, (moon_x, moon_y), frameon=False)
 ax.add_artist(moon_ab)
+
+# Recalculate Neptune's position (needed outside the main loop)
+neptune_L = longitudes['Neptune'] % 360
+neptune_theta_deg = 0 - neptune_L
+neptune_theta = math.radians(-neptune_theta_deg)
+neptune_r_plot = planet_radii['Neptune']
+neptune_x = cx + neptune_r_plot * math.cos(neptune_theta)
+neptune_y = cy + neptune_r_plot * math.sin(neptune_theta)
+
+# Triton Orbital Data (Horizons Epoch: Jan 1 2025)
+# Note: Triton is Retrograde (inclination > 90), so we subtract time from angle
+triton_epoch_angle = 2.733989
+triton_period = 5.877
+triton_orbit_r = 0.08
+
+# Ensure days_since_epoch is defined (re-using your variable from Mars section)
+# epoch_date = 2460676.5 (Jan 1 2025)
+days_since_epoch = utc.ut - 2460676.5
+
+# Calculate Angle (Retrograde: subtract progress instead of adding)
+triton_angle = (triton_epoch_angle - (days_since_epoch / triton_period * 360)) % 360
+triton_theta = math.radians(-(0 - triton_angle))
+
+# Calculate Position
+triton_x = neptune_x + triton_orbit_r * math.cos(triton_theta)
+triton_y = neptune_y + triton_orbit_r * math.sin(triton_theta)
+
+# Plot Triton
+# Color: Pale Blue/Pinkish White (Triton is icy)
+triton_color = '#E6E6FA' if use_colors else 'white' 
+triton_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.12, color=triton_color)
+ax.add_artist(AnnotationBbox(triton_imagebox, (triton_x, triton_y), frameon=False))
 
 # Ceres
 ceres_L, ceres_theta = calculate_dwarf_planet('Ceres', 2.77, 1680)
@@ -707,6 +740,33 @@ if show_trails:
             ax.plot([arc_x[i], arc_x[i+1]], 
                    [arc_y[i], arc_y[i+1]], 
                    color=trail_color, alpha=alphas[i], linewidth=0.8)
+
+# Triton trail
+if show_trails:
+    # Arc fraction (Triton is fast, 1/2 orbit looks good)
+    triton_trail_fraction = 1/2
+    arc_span = 360 * triton_trail_fraction
+    
+    # Retrograde Trail Logic:
+    # Since Triton moves "backwards" (clockwise), the past is "counter-clockwise" (positive angle addition)
+    theta_start = triton_theta
+    theta_end = triton_theta + math.radians(arc_span)
+    
+    # Generate arc points
+    theta_range = np.linspace(theta_start, theta_end, 50)
+    
+    t_arc_x = neptune_x + triton_orbit_r * np.cos(theta_range)
+    t_arc_y = neptune_y + triton_orbit_r * np.sin(theta_range)
+    
+    # Plot with fading alpha
+    alphas = np.linspace(0.6, 0, len(theta_range))
+    
+    for i in range(len(t_arc_x) - 1):
+        ax.plot([t_arc_x[i], t_arc_x[i+1]], 
+               [t_arc_y[i], t_arc_y[i+1]], 
+               color=triton_color, alpha=alphas[i], linewidth=0.7)
+
+
 
 
 # ═══════════════════════════════════════════════════════════════════════════
