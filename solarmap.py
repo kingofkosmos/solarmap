@@ -575,6 +575,65 @@ ceres_y = cy + ceres_r * math.sin(ceres_theta)
 ceres_imagebox = svg_to_imagebox("icons/pluto.svg", zoom=0.11, color='#A0826D' if use_colors else None)
 ax.add_artist(AnnotationBbox(ceres_imagebox, (ceres_x, ceres_y), frameon=False))
 
+# Saturn's moons
+saturn_L = longitudes['Saturn'] % 360
+saturn_theta_deg = 0 - saturn_L
+saturn_theta = math.radians(-saturn_theta_deg)
+saturn_r = planet_radii['Saturn']
+saturn_x = cx + saturn_r * math.cos(saturn_theta)
+saturn_y = cy + saturn_r * math.sin(saturn_theta)
+
+# Orbital data from HORIZONS (epoch: 2025-01-01 00:00 UTC)
+titan_epoch_angle = 356.104439
+titan_period = 15.945
+titan_orbit_r = 0.11
+
+rhea_epoch_angle = 2.830452
+rhea_period = 4.518
+rhea_orbit_r = 0.10
+
+iapetus_epoch_angle = 5.711541
+iapetus_period = 79.33
+iapetus_orbit_r = 0.12
+
+# Calculate current positions (reusing epoch_date and days_since_epoch from Mars moons)
+titan_angle = (titan_epoch_angle + days_since_epoch / titan_period * 360) % 360
+rhea_angle = (rhea_epoch_angle + days_since_epoch / rhea_period * 360) % 360
+iapetus_angle = (iapetus_epoch_angle + days_since_epoch / iapetus_period * 360) % 360
+
+# Convert to radians and plot
+titan_theta = math.radians(-(0 - titan_angle))
+rhea_theta = math.radians(-(0 - rhea_angle))
+iapetus_theta = math.radians(-(0 - iapetus_angle))
+
+titan_x = saturn_x + titan_orbit_r * math.cos(titan_theta)
+titan_y = saturn_y + titan_orbit_r * math.sin(titan_theta)
+
+rhea_x = saturn_x + rhea_orbit_r * math.cos(rhea_theta)
+rhea_y = saturn_y + rhea_orbit_r * math.sin(rhea_theta)
+
+iapetus_x = saturn_x + iapetus_orbit_r * math.cos(iapetus_theta)
+iapetus_y = saturn_y + iapetus_orbit_r * math.sin(iapetus_theta)
+
+# Saturn moon colors
+saturn_moon_colors = {
+    'Titan': '#FFA500',     # Orange (thick atmosphere)
+    'Rhea': '#C0C0C0',      # Silver-gray (icy)
+    'Iapetus': '#8B7355'    # Brown-gray (two-toned, dark side)
+}
+
+titan_color = saturn_moon_colors['Titan'] if use_colors else 'white'
+rhea_color = saturn_moon_colors['Rhea'] if use_colors else 'white'
+iapetus_color = saturn_moon_colors['Iapetus'] if use_colors else 'white'
+
+titan_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.12, color=titan_color)
+rhea_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.10, color=rhea_color)
+iapetus_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.10, color=iapetus_color)
+
+ax.add_artist(AnnotationBbox(titan_imagebox, (titan_x, titan_y), frameon=False))
+ax.add_artist(AnnotationBbox(rhea_imagebox, (rhea_x, rhea_y), frameon=False))
+ax.add_artist(AnnotationBbox(iapetus_imagebox, (iapetus_x, iapetus_y), frameon=False))
+
 
 
 
@@ -766,6 +825,45 @@ if show_trails:
                [t_arc_y[i], t_arc_y[i+1]], 
                color=triton_color, alpha=alphas[i], linewidth=0.7)
 
+# Saturn moons trails
+if show_trails:
+    # Arc fractions for Saturn moons
+    saturn_arc_fractions = {
+        'Titan': 1/8,
+        'Rhea': 1/4,
+        'Iapetus': 1/12
+    }
+    
+    saturn_moon_data = [
+        ('Titan', titan_orbit_r, titan_angle),
+        ('Rhea', rhea_orbit_r, rhea_angle),
+        ('Iapetus', iapetus_orbit_r, iapetus_angle)
+    ]
+    
+    for moon_name, orbit_r, current_angle in saturn_moon_data:
+        current_theta_deg = 0 - current_angle
+        
+        # Calculate arc span
+        arc_span = 360 * saturn_arc_fractions[moon_name]
+        
+        # Create arc from current position backwards
+        theta_start = math.radians(-current_theta_deg)
+        theta_end = math.radians(-(current_theta_deg + arc_span))
+        
+        # Generate arc points
+        theta_range = np.linspace(theta_start, theta_end, 50)
+        
+        arc_x = saturn_x + orbit_r * np.cos(theta_range)
+        arc_y = saturn_y + orbit_r * np.sin(theta_range)
+        
+        # Plot with fading alpha
+        alphas = np.linspace(0.6, 0, len(theta_range))
+        trail_color = saturn_moon_colors[moon_name] if use_colors else 'white'
+        
+        for i in range(len(arc_x) - 1):
+            ax.plot([arc_x[i], arc_x[i+1]], 
+                   [arc_y[i], arc_y[i+1]], 
+                   color=trail_color, alpha=alphas[i], linewidth=0.8)
 
 
 
