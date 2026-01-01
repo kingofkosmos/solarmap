@@ -240,7 +240,7 @@ for name, L in longitudes.items():
     svg_path = f"icons/{name.lower()}.svg"
     
     # Set zoom level (custom for Pluto)
-    zoom = 0.11 if name == "Pluto" else 0.3
+    zoom = 0.08 if name == "Pluto" else 0.3
 
     # Special handling for Earth to add green landmasses
     if name == "Earth" and use_colors:
@@ -431,6 +431,13 @@ moon_radii = {
     'Callisto': 0.14
 }
 
+jupiter_moon_zooms = {
+    'Ganymede': 0.15,
+    'Callisto': 0.13,
+    'Io': 0.11,
+    'Europa': 0.10
+}
+
 jm = JupiterMoons(utc)
 moon_data = {
     'Io': jm.io,
@@ -456,7 +463,7 @@ for moon_name, moon_vec in moon_data.items():
 
     moon_color = jupiter_moon_colors[moon_name] if use_colors else 'white'
     
-    imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.11, color=moon_color)
+    imagebox = svg_to_imagebox("icons/moon.svg", zoom=jupiter_moon_zooms[moon_name], color=moon_color)
     ab = AnnotationBbox(imagebox, (x, y), frameon=False)
     ax.add_artist(ab)
 
@@ -473,7 +480,7 @@ moon_x = earth_x + earth_ring_r * math.cos(moon_theta)
 moon_y = earth_y + earth_ring_r * math.sin(moon_theta)
 
 # Plot Moon
-moon_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.12)
+moon_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.11)
 moon_ab = AnnotationBbox(moon_imagebox, (moon_x, moon_y), frameon=False)
 ax.add_artist(moon_ab)
 
@@ -506,7 +513,7 @@ triton_y = neptune_y + triton_orbit_r * math.sin(triton_theta)
 # Plot Triton
 # Color: Pale Blue/Pinkish White (Triton is icy)
 triton_color = '#E6E6FA' if use_colors else 'white' 
-triton_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.12, color=triton_color)
+triton_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.09, color=triton_color)
 ax.add_artist(AnnotationBbox(triton_imagebox, (triton_x, triton_y), frameon=False))
 
 # Ceres
@@ -515,7 +522,7 @@ ceres_r = (mars_r + jupiter_r) / 2  # Middle of asteroid belt
 ceres_x = cx + ceres_r * math.cos(ceres_theta)
 ceres_y = cy + ceres_r * math.sin(ceres_theta)
 
-ceres_imagebox = svg_to_imagebox("icons/pluto.svg", zoom=0.11, color='#A0826D' if use_colors else None)
+ceres_imagebox = svg_to_imagebox("icons/pluto.svg", zoom=0.05, color='#A0826D' if use_colors else None)
 ax.add_artist(AnnotationBbox(ceres_imagebox, (ceres_x, ceres_y), frameon=False))
 
 # Saturn's moons
@@ -569,9 +576,9 @@ titan_color = saturn_moon_colors['Titan'] if use_colors else 'white'
 rhea_color = saturn_moon_colors['Rhea'] if use_colors else 'white'
 iapetus_color = saturn_moon_colors['Iapetus'] if use_colors else 'white'
 
-titan_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.12, color=titan_color)
-rhea_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.10, color=rhea_color)
-iapetus_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.10, color=iapetus_color)
+titan_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.14, color=titan_color)
+rhea_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.06, color=rhea_color)
+iapetus_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.06, color=iapetus_color)
 
 ax.add_artist(AnnotationBbox(titan_imagebox, (titan_x, titan_y), frameon=False))
 ax.add_artist(AnnotationBbox(rhea_imagebox, (rhea_x, rhea_y), frameon=False))
@@ -617,8 +624,8 @@ uranus_moon_colors = {
 titania_color = uranus_moon_colors['Titania'] if use_colors else 'white'
 oberon_color = uranus_moon_colors['Oberon'] if use_colors else 'white'
 
-titania_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.09, color=titania_color)
-oberon_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.09, color=oberon_color)
+titania_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.06, color=titania_color)
+oberon_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.06, color=oberon_color)
 
 ax.add_artist(AnnotationBbox(titania_imagebox, (titania_x, titania_y), frameon=False))
 ax.add_artist(AnnotationBbox(oberon_imagebox, (oberon_x, oberon_y), frameon=False))
