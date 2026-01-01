@@ -19,8 +19,7 @@ import datetime
 #TODO: Astrology?
 ##      Sky division to constellations
 ##      Meanings of planets in different constellations?
-#TODO: More realistic moon sizes?
-#TODO: Weather info?
+#TODO: Weather info? (requires internet access)
 ##      Previous day temperature average
 ##      Forecast high/low for next day
 #TODO: Comets (Halley, Hale-Bopp)
@@ -28,9 +27,7 @@ import datetime
 #TODO: Fix planet names not showing
 #TODO: Planet labels working with different DPIs
 #TODO: Optional background stars
-#TODO: Optional colors to rings
-#TODO: Optional colors to background
-
+#TODO: Optional realistic elliptical orbits (enables rest of the dwarf planets)
 
 
 
@@ -108,8 +105,6 @@ def calculate_dwarf_planet(name, semi_major_axis_au, orbital_period_days, ref_lo
     theta = math.radians(-(0 - L))
     return L, theta
 
-
-
 # Get current time
 if custom_date:
     year, month, day = map(int, custom_date.split('-'))
@@ -119,6 +114,7 @@ else:
 
 # Calculate longitudes (angles from the Sun)
 longitudes = {planet.name: EclipticLongitude(planet, utc) for planet in planets}
+
 
 
 
@@ -147,6 +143,7 @@ taskbar_offset = 0.02
 # Shift center up by 5% of y-axis range
 cy_offset = taskbar_offset * 2.6  # 2.6 is your y-axis range (from -1.3 to 1.3)
 cy = cy + cy_offset
+
 
 
 
@@ -237,7 +234,7 @@ for name, L in longitudes.items():
         earth_x, earth_y = x, y
 
 # Plot planet icons
-    svg_path = f"icons/{name.lower()}.svg"
+    svg_path = "icons/moon.svg" if name == "Pluto" else f"icons/{name.lower()}.svg"
     
     # Set zoom level (custom for Pluto)
     zoom = 0.08 if name == "Pluto" else 0.3
@@ -273,6 +270,59 @@ for name, L in longitudes.items():
         imagebox = svg_to_imagebox(svg_path, zoom=zoom, color=color)
         ab = AnnotationBbox(imagebox, (x, y), frameon=False)
         ax.add_artist(ab)
+
+# Orbital trails
+if show_trails:
+    # Calculate orbital periods (in days) for each planet
+    orbital_periods = {
+        'Mercury': 88,
+        'Venus': 225,
+        'Earth': 365,
+        'Mars': 687,
+        'Jupiter': 4333,
+        'Saturn': 10759,
+        'Uranus': 30687,
+        'Neptune': 60190,
+        'Pluto': 90560
+    }
+    
+    for planet in planets:
+        name = planet.name
+
+        # Skip Pluto's trail
+        if name == 'Pluto':
+            continue
+
+        r = planet_radii.get(name, 1)
+        
+        # Calculate current position
+        L = longitudes[name] % 360
+        theta_deg = 0 - L
+        current_theta = math.radians(-theta_deg)
+        
+        # Calculate what fraction of orbit to show based on trail_days
+        period = orbital_periods[name]
+        arc_fraction = trail_days / period
+        arc_span = 360 * arc_fraction
+        
+        # Create arc from current position backwards
+        theta_start = current_theta
+        theta_end = current_theta - math.radians(arc_span)
+        
+        # Generate arc points
+        theta_range = np.linspace(theta_start, theta_end, 100)
+        
+        arc_x = cx + r * np.cos(theta_range)
+        arc_y = cy + r * np.sin(theta_range)
+        
+        # Plot trail with fading alpha
+        num_points = len(arc_x)
+        alphas = np.linspace(0.6, 0, num_points)
+        
+        for i in range(num_points - 1):
+            ax.plot([arc_x[i], arc_x[i+1]], 
+                   [arc_y[i], arc_y[i+1]], 
+                   color=planet_colors.get(name, 'white') if use_colors else 'white', alpha=alphas[i], linewidth=1.5)
 
 
 
@@ -417,7 +467,7 @@ trojan_cloud(jupiter_r, jupiter_L, -60)   # L5
 # 9. MOONS AND DWARF PLANETS
 # ═══════════════════════════════════════════════════════════════════════════
 
-# Jupiter's moon rings
+# Jupiter's moons
 jupiter_L = longitudes['Jupiter'] % 360
 jupiter_theta_deg = 0 - jupiter_L
 jupiter_theta = math.radians(-jupiter_theta_deg)
@@ -431,13 +481,6 @@ moon_radii = {
     'Callisto': 0.14
 }
 
-jupiter_moon_zooms = {
-    'Ganymede': 0.15,
-    'Callisto': 0.13,
-    'Io': 0.11,
-    'Europa': 0.10
-}
-
 jm = JupiterMoons(utc)
 moon_data = {
     'Io': jm.io,
@@ -446,12 +489,28 @@ moon_data = {
     'Callisto': jm.callisto
 }
 
-# Realistic colors for Jupiter's moons
+# Jupiter moon colors
 jupiter_moon_colors = {
-    'Io': '#F4D03F',        # Sulfur yellow
-    'Europa': '#D4C5B0',    # Pale tan/cream (ice)
-    'Ganymede': '#8B7E66',  # Gray-brown
-    'Callisto': '#4A4A4A'   # Dark gray
+    'Io': '#F4D03F',
+    'Europa': '#D4C5B0',
+    'Ganymede': '#8B7E66',
+    'Callisto': '#4A4A4A'
+}
+
+# Jupiter moon zooms
+jupiter_moon_zooms = {
+    'Io': 0.11,
+    'Europa': 0.10,
+    'Ganymede': 0.15,
+    'Callisto': 0.13
+}
+
+# Jupiter moon trail fractions
+jupiter_moon_trails = {
+    'Io': 1/4,
+    'Europa': 1/5,
+    'Ganymede': 1/8,
+    'Callisto': 1/10
 }
 
 for moon_name, moon_vec in moon_data.items():
@@ -462,16 +521,37 @@ for moon_name, moon_vec in moon_data.items():
     y = jupiter_y + r * math.sin(theta)
 
     moon_color = jupiter_moon_colors[moon_name] if use_colors else 'white'
+    moon_zoom = jupiter_moon_zooms[moon_name]
     
-    imagebox = svg_to_imagebox("icons/moon.svg", zoom=jupiter_moon_zooms[moon_name], color=moon_color)
+    # Plot Jupiter's moon
+    imagebox = svg_to_imagebox("icons/moon.svg", zoom=moon_zoom, color=moon_color)
     ab = AnnotationBbox(imagebox, (x, y), frameon=False)
     ax.add_artist(ab)
+    
+    # Plot trail
+    if show_trails:
+        current_theta_deg = 0 - angle
+        arc_span = 360 * jupiter_moon_trails[moon_name]
+        
+        theta_start = math.radians(-current_theta_deg)
+        theta_end = math.radians(-(current_theta_deg + arc_span))
+        
+        theta_range = np.linspace(theta_start, theta_end, 50)
+        
+        arc_x = jupiter_x + r * np.cos(theta_range)
+        arc_y = jupiter_y + r * np.sin(theta_range)
+        
+        alphas = np.linspace(0.6, 0, len(theta_range))
+        
+        for i in range(len(arc_x) - 1):
+            ax.plot([arc_x[i], arc_x[i+1]], 
+                   [arc_y[i], arc_y[i+1]], 
+                   color=moon_color, alpha=alphas[i], linewidth=0.8)
+        
+# Earth's Moon
+moon_ring_size = 250
+earth_ring_r = 0.06
 
-# Earth's Moon ring
-moon_ring_size = 250 # To keep Moon ring consistent across DPIs
-earth_ring_r = 0.06  # adjust visually
-
-# Moon's position relative to Earth
 moon_vec = GeoVector(Body.Moon, utc, True)
 moon_angle = math.degrees(math.atan2(moon_vec.y, moon_vec.x))
 moon_theta_deg = 0 - moon_angle
@@ -479,12 +559,33 @@ moon_theta = math.radians(-moon_theta_deg)
 moon_x = earth_x + earth_ring_r * math.cos(moon_theta)
 moon_y = earth_y + earth_ring_r * math.sin(moon_theta)
 
-# Plot Moon
+# Plot Earth's Moon
 moon_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.11)
 moon_ab = AnnotationBbox(moon_imagebox, (moon_x, moon_y), frameon=False)
 ax.add_artist(moon_ab)
 
-# Recalculate Neptune's position (needed outside the main loop)
+# Earth's Moon trail
+if show_trails:
+    moon_trail_fraction = 1/2
+    current_moon_theta_deg = 0 - moon_angle
+    arc_span = 360 * moon_trail_fraction
+    
+    theta_start = math.radians(-current_moon_theta_deg)
+    theta_end = math.radians(-(current_moon_theta_deg + arc_span))
+    
+    theta_range = np.linspace(theta_start, theta_end, 50)
+    
+    arc_x = earth_x + earth_ring_r * np.cos(theta_range)
+    arc_y = earth_y + earth_ring_r * np.sin(theta_range)
+    
+    alphas = np.linspace(0.6, 0, len(theta_range))
+    
+    for i in range(len(arc_x) - 1):
+        ax.plot([arc_x[i], arc_x[i+1]], 
+               [arc_y[i], arc_y[i+1]], 
+               color='white', alpha=alphas[i], linewidth=1.0)
+
+# Neptune's moon Triton
 neptune_L = longitudes['Neptune'] % 360
 neptune_theta_deg = 0 - neptune_L
 neptune_theta = math.radians(-neptune_theta_deg)
@@ -492,38 +593,41 @@ neptune_r_plot = planet_radii['Neptune']
 neptune_x = cx + neptune_r_plot * math.cos(neptune_theta)
 neptune_y = cy + neptune_r_plot * math.sin(neptune_theta)
 
-# Triton Orbital Data (Horizons Epoch: Jan 1 2025)
-# Note: Triton is Retrograde (inclination > 90), so we subtract time from angle
 triton_epoch_angle = 2.733989
 triton_period = 5.877
 triton_orbit_r = 0.08
 
-# Ensure days_since_epoch is defined (re-using your variable from Mars section)
-# epoch_date = 2460676.5 (Jan 1 2025)
 days_since_epoch = utc.ut - 2460676.5
 
-# Calculate Angle (Retrograde: subtract progress instead of adding)
 triton_angle = (triton_epoch_angle - (days_since_epoch / triton_period * 360)) % 360
 triton_theta = math.radians(-(0 - triton_angle))
 
-# Calculate Position
 triton_x = neptune_x + triton_orbit_r * math.cos(triton_theta)
 triton_y = neptune_y + triton_orbit_r * math.sin(triton_theta)
 
-# Plot Triton
-# Color: Pale Blue/Pinkish White (Triton is icy)
-triton_color = '#E6E6FA' if use_colors else 'white' 
+triton_color = '#E6E6FA' if use_colors else 'white'
 triton_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.09, color=triton_color)
 ax.add_artist(AnnotationBbox(triton_imagebox, (triton_x, triton_y), frameon=False))
 
-# Ceres
-ceres_L, ceres_theta = calculate_dwarf_planet('Ceres', 2.77, 1680)
-ceres_r = (mars_r + jupiter_r) / 2  # Middle of asteroid belt
-ceres_x = cx + ceres_r * math.cos(ceres_theta)
-ceres_y = cy + ceres_r * math.sin(ceres_theta)
-
-ceres_imagebox = svg_to_imagebox("icons/pluto.svg", zoom=0.05, color='#A0826D' if use_colors else None)
-ax.add_artist(AnnotationBbox(ceres_imagebox, (ceres_x, ceres_y), frameon=False))
+# Triton trail (retrograde)
+if show_trails:
+    triton_trail_fraction = 1/2
+    arc_span = 360 * triton_trail_fraction
+    
+    theta_start = triton_theta
+    theta_end = triton_theta + math.radians(arc_span)
+    
+    theta_range = np.linspace(theta_start, theta_end, 50)
+    
+    t_arc_x = neptune_x + triton_orbit_r * np.cos(theta_range)
+    t_arc_y = neptune_y + triton_orbit_r * np.sin(theta_range)
+    
+    alphas = np.linspace(0.6, 0, len(theta_range))
+    
+    for i in range(len(t_arc_x) - 1):
+        ax.plot([t_arc_x[i], t_arc_x[i+1]], 
+               [t_arc_y[i], t_arc_y[i+1]], 
+               color=triton_color, alpha=alphas[i], linewidth=0.7)
 
 # Saturn's moons
 saturn_L = longitudes['Saturn'] % 360
@@ -533,56 +637,66 @@ saturn_r = planet_radii['Saturn']
 saturn_x = cx + saturn_r * math.cos(saturn_theta)
 saturn_y = cy + saturn_r * math.sin(saturn_theta)
 
-# Orbital data from HORIZONS (epoch: 2025-01-01 00:00 UTC)
-titan_epoch_angle = 356.104439
-titan_period = 15.945
-titan_orbit_r = 0.11
-
-rhea_epoch_angle = 2.830452
-rhea_period = 4.518
-rhea_orbit_r = 0.10
-
-iapetus_epoch_angle = 5.711541
-iapetus_period = 79.33
-iapetus_orbit_r = 0.12
-
-# Calculate current positions (reusing epoch_date and days_since_epoch from Mars moons)
-titan_angle = (titan_epoch_angle + days_since_epoch / titan_period * 360) % 360
-rhea_angle = (rhea_epoch_angle + days_since_epoch / rhea_period * 360) % 360
-iapetus_angle = (iapetus_epoch_angle + days_since_epoch / iapetus_period * 360) % 360
-
-# Convert to radians and plot
-titan_theta = math.radians(-(0 - titan_angle))
-rhea_theta = math.radians(-(0 - rhea_angle))
-iapetus_theta = math.radians(-(0 - iapetus_angle))
-
-titan_x = saturn_x + titan_orbit_r * math.cos(titan_theta)
-titan_y = saturn_y + titan_orbit_r * math.sin(titan_theta)
-
-rhea_x = saturn_x + rhea_orbit_r * math.cos(rhea_theta)
-rhea_y = saturn_y + rhea_orbit_r * math.sin(rhea_theta)
-
-iapetus_x = saturn_x + iapetus_orbit_r * math.cos(iapetus_theta)
-iapetus_y = saturn_y + iapetus_orbit_r * math.sin(iapetus_theta)
-
-# Saturn moon colors
-saturn_moon_colors = {
-    'Titan': '#FFA500',     # Orange (thick atmosphere)
-    'Rhea': '#C0C0C0',      # Silver-gray (icy)
-    'Iapetus': '#8B7355'    # Brown-gray (two-toned, dark side)
+# Saturn moon data
+saturn_moon_data = {
+    'Titan': {
+        'epoch_angle': 356.104439,
+        'period': 15.945,
+        'orbit_r': 0.11,
+        'color': '#FFA500',
+        'zoom': 0.14,
+        'trail_fraction': 1/8
+    },
+    'Rhea': {
+        'epoch_angle': 2.830452,
+        'period': 4.518,
+        'orbit_r': 0.10,
+        'color': '#C0C0C0',
+        'zoom': 0.06,
+        'trail_fraction': 1/4
+    },
+    'Iapetus': {
+        'epoch_angle': 5.711541,
+        'period': 79.33,
+        'orbit_r': 0.12,
+        'color': '#8B7355',
+        'zoom': 0.06,
+        'trail_fraction': 1/12
+    }
 }
 
-titan_color = saturn_moon_colors['Titan'] if use_colors else 'white'
-rhea_color = saturn_moon_colors['Rhea'] if use_colors else 'white'
-iapetus_color = saturn_moon_colors['Iapetus'] if use_colors else 'white'
-
-titan_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.14, color=titan_color)
-rhea_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.06, color=rhea_color)
-iapetus_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.06, color=iapetus_color)
-
-ax.add_artist(AnnotationBbox(titan_imagebox, (titan_x, titan_y), frameon=False))
-ax.add_artist(AnnotationBbox(rhea_imagebox, (rhea_x, rhea_y), frameon=False))
-ax.add_artist(AnnotationBbox(iapetus_imagebox, (iapetus_x, iapetus_y), frameon=False))
+for moon_name, data in saturn_moon_data.items():
+    # Calculate position
+    angle = (data['epoch_angle'] + days_since_epoch / data['period'] * 360) % 360
+    theta = math.radians(-(0 - angle))
+    
+    x = saturn_x + data['orbit_r'] * math.cos(theta)
+    y = saturn_y + data['orbit_r'] * math.sin(theta)
+    
+    # Plot Saturn's moon
+    moon_color = data['color'] if use_colors else 'white'
+    imagebox = svg_to_imagebox("icons/moon.svg", zoom=data['zoom'], color=moon_color)
+    ax.add_artist(AnnotationBbox(imagebox, (x, y), frameon=False))
+    
+    # Plot trail
+    if show_trails:
+        current_theta_deg = 0 - angle
+        arc_span = 360 * data['trail_fraction']
+        
+        theta_start = math.radians(-current_theta_deg)
+        theta_end = math.radians(-(current_theta_deg + arc_span))
+        
+        theta_range = np.linspace(theta_start, theta_end, 50)
+        
+        arc_x = saturn_x + data['orbit_r'] * np.cos(theta_range)
+        arc_y = saturn_y + data['orbit_r'] * np.sin(theta_range)
+        
+        alphas = np.linspace(0.6, 0, len(theta_range))
+        
+        for i in range(len(arc_x) - 1):
+            ax.plot([arc_x[i], arc_x[i+1]], 
+                   [arc_y[i], arc_y[i+1]], 
+                   color=moon_color, alpha=alphas[i], linewidth=0.8)
 
 # Uranus's moons
 uranus_L = longitudes['Uranus'] % 360
@@ -592,280 +706,82 @@ uranus_r = planet_radii['Uranus']
 uranus_x = cx + uranus_r * math.cos(uranus_theta)
 uranus_y = cy + uranus_r * math.sin(uranus_theta)
 
-# Orbital data from HORIZONS (epoch: 2025-01-01 00:00 UTC)
-titania_epoch_angle = 0.855326
-titania_period = 8.706
-titania_orbit_r = 0.07
-
-oberon_epoch_angle = 0.910603
-oberon_period = 13.463
-oberon_orbit_r = 0.08
-
-# Calculate current positions
-titania_angle = (titania_epoch_angle + days_since_epoch / titania_period * 360) % 360
-oberon_angle = (oberon_epoch_angle + days_since_epoch / oberon_period * 360) % 360
-
-# Convert to radians and plot
-titania_theta = math.radians(-(0 - titania_angle))
-oberon_theta = math.radians(-(0 - oberon_angle))
-
-titania_x = uranus_x + titania_orbit_r * math.cos(titania_theta)
-titania_y = uranus_y + titania_orbit_r * math.sin(titania_theta)
-
-oberon_x = uranus_x + oberon_orbit_r * math.cos(oberon_theta)
-oberon_y = uranus_y + oberon_orbit_r * math.sin(oberon_theta)
-
-# Uranus moon colors
-uranus_moon_colors = {
-    'Titania': '#B0A090',   # Light gray-brown (icy with some rock)
-    'Oberon': '#8B8680'     # Darker gray (heavily cratered ice)
+# Uranus's moons data
+uranus_moon_data = {
+    'Titania': {
+        'epoch_angle': 0.855326,
+        'period': 8.706,
+        'orbit_r': 0.07,
+        'color': '#B0A090',
+        'zoom': 0.06,
+        'trail_fraction': 1/6
+    },
+    'Oberon': {
+        'epoch_angle': 0.910603,
+        'period': 13.463,
+        'orbit_r': 0.08,
+        'color': '#8B8680',
+        'zoom': 0.06,
+        'trail_fraction': 1/8
+    }
 }
 
-titania_color = uranus_moon_colors['Titania'] if use_colors else 'white'
-oberon_color = uranus_moon_colors['Oberon'] if use_colors else 'white'
-
-titania_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.06, color=titania_color)
-oberon_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.06, color=oberon_color)
-
-ax.add_artist(AnnotationBbox(titania_imagebox, (titania_x, titania_y), frameon=False))
-ax.add_artist(AnnotationBbox(oberon_imagebox, (oberon_x, oberon_y), frameon=False))
-
-
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# 10. ORBITAL TRAILS
-# ═══════════════════════════════════════════════════════════════════════════
-
-# Orbital trails
-if show_trails:
-    # Calculate orbital periods (in days) for each planet
-    orbital_periods = {
-        'Mercury': 88,
-        'Venus': 225,
-        'Earth': 365,
-        'Mars': 687,
-        'Jupiter': 4333,
-        'Saturn': 10759,
-        'Uranus': 30687,
-        'Neptune': 60190,
-        'Pluto': 90560
-    }
+for moon_name, data in uranus_moon_data.items():
+    # Calculate position
+    angle = (data['epoch_angle'] + days_since_epoch / data['period'] * 360) % 360
+    theta = math.radians(-(0 - angle))
     
-    for planet in planets:
-        name = planet.name
-
-        # Skip Pluto's trail
-        if name == 'Pluto':
-            continue
-
-        r = planet_radii.get(name, 1)
-        
-        # Calculate current position
-        L = longitudes[name] % 360
-        theta_deg = 0 - L
-        current_theta = math.radians(-theta_deg)
-        
-        # Calculate what fraction of orbit to show based on trail_days
-        period = orbital_periods[name]
-        arc_fraction = trail_days / period
-        arc_span = 360 * arc_fraction
-        
-        # Create arc from current position backwards
-        theta_start = current_theta
-        theta_end = current_theta - math.radians(arc_span)
-        
-        # Generate arc points
-        theta_range = np.linspace(theta_start, theta_end, 100)
-        
-        arc_x = cx + r * np.cos(theta_range)
-        arc_y = cy + r * np.sin(theta_range)
-        
-        # Plot trail with fading alpha
-        num_points = len(arc_x)
-        alphas = np.linspace(0.6, 0, num_points)
-        
-        for i in range(num_points - 1):
-            ax.plot([arc_x[i], arc_x[i+1]], 
-                   [arc_y[i], arc_y[i+1]], 
-                   color=planet_colors.get(name, 'white') if use_colors else 'white', alpha=alphas[i], linewidth=1.5)
-
-# Moon trail
-moon_trail_fraction = 1/2 
-
-if show_trails:
-    # Get current moon position angle
-    current_moon_angle = math.degrees(math.atan2(moon_vec.y, moon_vec.x))
-    current_moon_theta_deg = 0 - current_moon_angle
+    x = uranus_x + data['orbit_r'] * math.cos(theta)
+    y = uranus_y + data['orbit_r'] * math.sin(theta)
     
-    arc_span = 360 * moon_trail_fraction
+    # Plot moon
+    moon_color = data['color'] if use_colors else 'white'
+    imagebox = svg_to_imagebox("icons/moon.svg", zoom=data['zoom'], color=moon_color)
+    ax.add_artist(AnnotationBbox(imagebox, (x, y), frameon=False))
     
-    # Create arc from current position backwards
-    theta_start = math.radians(-current_moon_theta_deg)
-    theta_end = math.radians(-(current_moon_theta_deg + arc_span))
-    
-    # Generate arc points
-    theta_range = np.linspace(theta_start, theta_end, 50)
-    
-    arc_x = earth_x + earth_ring_r * np.cos(theta_range)
-    arc_y = earth_y + earth_ring_r * np.sin(theta_range)
-    
-    # Plot with fading alpha
-    alphas = np.linspace(0.6, 0, len(theta_range))
-    
-    for i in range(len(arc_x) - 1):
-        ax.plot([arc_x[i], arc_x[i+1]], 
-               [arc_y[i], arc_y[i+1]], 
-               color='white', alpha=alphas[i], linewidth=1.0)
-
-
-# Jupiter moons trails
-if show_trails:
-    # Arc fraction lengths for each moon
-    arc_fractions = {
-        'Io': 1/4,
-        'Europa': 1/5,
-        'Ganymede': 1/8,
-        'Callisto': 1/10
-    }
-    
-    for moon_name in moon_data.keys():
-        # Get current moon position angle
-        moon_vec = moon_data[moon_name]
-        current_angle = math.degrees(math.atan2(moon_vec.y, moon_vec.x))
-        current_theta_deg = 0 - current_angle
+    # Plot trail
+    if show_trails:
+        current_theta_deg = 0 - angle
+        arc_span = 360 * data['trail_fraction']
         
-        # Calculate arc span
-        arc_span = 360 * arc_fractions[moon_name]
-        
-        # Create arc from current position backwards
         theta_start = math.radians(-current_theta_deg)
         theta_end = math.radians(-(current_theta_deg + arc_span))
         
-        # Generate arc points
-        theta_range = np.linspace(theta_start, theta_end, 50)
-        r = moon_radii[moon_name]
-        
-        arc_x = jupiter_x + r * np.cos(theta_range)
-        arc_y = jupiter_y + r * np.sin(theta_range)
-        
-        # Plot with fading alpha - use individual moon color
-        alphas = np.linspace(0.6, 0, len(theta_range))
-        trail_color = jupiter_moon_colors[moon_name] if use_colors else 'white'
-            
-        for i in range(len(arc_x) - 1):
-            ax.plot([arc_x[i], arc_x[i+1]], 
-                   [arc_y[i], arc_y[i+1]], 
-                   color=trail_color, alpha=alphas[i], linewidth=0.8)
-
-# Triton trail
-if show_trails:
-    # Arc fraction (Triton is fast, 1/2 orbit looks good)
-    triton_trail_fraction = 1/2
-    arc_span = 360 * triton_trail_fraction
-    
-    # Retrograde Trail Logic:
-    # Since Triton moves "backwards" (clockwise), the past is "counter-clockwise" (positive angle addition)
-    theta_start = triton_theta
-    theta_end = triton_theta + math.radians(arc_span)
-    
-    # Generate arc points
-    theta_range = np.linspace(theta_start, theta_end, 50)
-    
-    t_arc_x = neptune_x + triton_orbit_r * np.cos(theta_range)
-    t_arc_y = neptune_y + triton_orbit_r * np.sin(theta_range)
-    
-    # Plot with fading alpha
-    alphas = np.linspace(0.6, 0, len(theta_range))
-    
-    for i in range(len(t_arc_x) - 1):
-        ax.plot([t_arc_x[i], t_arc_x[i+1]], 
-               [t_arc_y[i], t_arc_y[i+1]], 
-               color=triton_color, alpha=alphas[i], linewidth=0.7)
-
-# Saturn moons trails
-if show_trails:
-    # Arc fractions for Saturn moons
-    saturn_arc_fractions = {
-        'Titan': 1/8,
-        'Rhea': 1/4,
-        'Iapetus': 1/12
-    }
-    
-    saturn_moon_data = [
-        ('Titan', titan_orbit_r, titan_angle),
-        ('Rhea', rhea_orbit_r, rhea_angle),
-        ('Iapetus', iapetus_orbit_r, iapetus_angle)
-    ]
-    
-    for moon_name, orbit_r, current_angle in saturn_moon_data:
-        current_theta_deg = 0 - current_angle
-        
-        # Calculate arc span
-        arc_span = 360 * saturn_arc_fractions[moon_name]
-        
-        # Create arc from current position backwards
-        theta_start = math.radians(-current_theta_deg)
-        theta_end = math.radians(-(current_theta_deg + arc_span))
-        
-        # Generate arc points
         theta_range = np.linspace(theta_start, theta_end, 50)
         
-        arc_x = saturn_x + orbit_r * np.cos(theta_range)
-        arc_y = saturn_y + orbit_r * np.sin(theta_range)
+        arc_x = uranus_x + data['orbit_r'] * np.cos(theta_range)
+        arc_y = uranus_y + data['orbit_r'] * np.sin(theta_range)
         
-        # Plot with fading alpha
         alphas = np.linspace(0.6, 0, len(theta_range))
-        trail_color = saturn_moon_colors[moon_name] if use_colors else 'white'
         
         for i in range(len(arc_x) - 1):
             ax.plot([arc_x[i], arc_x[i+1]], 
                    [arc_y[i], arc_y[i+1]], 
-                   color=trail_color, alpha=alphas[i], linewidth=0.8)
+                   color=moon_color, alpha=alphas[i], linewidth=0.7)
 
-# Uranus moons trails
-if show_trails:
-    # Arc fractions for Uranus moons
-    uranus_arc_fractions = {
-        'Titania': 1/6,
-        'Oberon': 1/8
-    }
-    
-    uranus_moon_data = [
-        ('Titania', titania_orbit_r, titania_angle),
-        ('Oberon', oberon_orbit_r, oberon_angle)
-    ]
-    
-    for moon_name, orbit_r, current_angle in uranus_moon_data:
-        current_theta_deg = 0 - current_angle
-        
-        # Calculate arc span
-        arc_span = 360 * uranus_arc_fractions[moon_name]
-        
-        # Create arc from current position backwards
-        theta_start = math.radians(-current_theta_deg)
-        theta_end = math.radians(-(current_theta_deg + arc_span))
-        
-        # Generate arc points
-        theta_range = np.linspace(theta_start, theta_end, 50)
-        
-        arc_x = uranus_x + orbit_r * np.cos(theta_range)
-        arc_y = uranus_y + orbit_r * np.sin(theta_range)
-        
-        # Plot with fading alpha
-        alphas = np.linspace(0.6, 0, len(theta_range))
-        trail_color = uranus_moon_colors[moon_name] if use_colors else 'white'
-        
-        for i in range(len(arc_x) - 1):
-            ax.plot([arc_x[i], arc_x[i+1]], 
-                   [arc_y[i], arc_y[i+1]], 
-                   color=trail_color, alpha=alphas[i], linewidth=0.7)
+# Dwarf Planet Ceres
+ceres_epoch_jd = 2460676.5   # Jan 1 2025
+ceres_L_epoch = 315.17       # Orbital Longitude on this date
+ceres_mean_motion = 0.21387  # Degrees per day
 
+# Calculate current position relative to 2025 epoch
+days_since_ceres_epoch = utc.ut - ceres_epoch_jd
+ceres_L = (ceres_L_epoch + ceres_mean_motion * days_since_ceres_epoch) % 360
+ceres_theta = math.radians(-(0 - ceres_L))
+
+# Plot Ceres
+# Visual radius placed between Mars and Jupiter for clarity
+ceres_r = (planet_radii['Mars'] + planet_radii['Jupiter']) / 2  
+ceres_x = cx + ceres_r * math.cos(ceres_theta)
+ceres_y = cy + ceres_r * math.sin(ceres_theta)
+
+ceres_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.05, color='#A0826D' if use_colors else None)
+ax.add_artist(AnnotationBbox(ceres_imagebox, (ceres_x, ceres_y), frameon=False))
 
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 11. CANVAS FINALIZATION
+# 10. CANVAS FINALIZATION
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Limits and aspect
@@ -888,7 +804,7 @@ ax.axis('off')
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 12. BOTTOM RIGHT INFO
+# 11. BOTTOM RIGHT INFO
 # ═══════════════════════════════════════════════════════════════════════════
 
 if show_info_text:
@@ -943,7 +859,7 @@ if show_info_text:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 12.1 MOON PHASE
+# 11.1 MOON PHASE
 # ═══════════════════════════════════════════════════════════════════════════
 
     # Get moon phase info
@@ -1036,7 +952,7 @@ if show_info_text:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 12.2 PLOT INFO TEXT
+# 11.2 PLOT INFO TEXT
 # ═══════════════════════════════════════════════════════════════════════════
 
     # Plot text
@@ -1057,7 +973,7 @@ if show_info_text:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 13. FINALIZE AND SAVE IMAGE
+# 12. FINALIZE AND SAVE IMAGE
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Save and show
