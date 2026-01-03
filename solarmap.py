@@ -1,5 +1,6 @@
 from astronomy import Time, Body, EclipticLongitude, GeoVector, Observer, SearchRiseSet, Direction, Illumination, SearchMoonPhase, JupiterMoons
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+from matplotlib.colors import hex2color
 import math
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
@@ -57,6 +58,26 @@ planet_colors = {
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# 2.1 VISUAL CONFIGURATION
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Random seed for reproducible star/asteroid patterns
+RANDOM_SEED = 123
+
+# Star field configuration
+STARS_CONFIG = {
+    'base_count': 200,
+    'base_size_range': (0.1, 1.5),
+    'base_alpha': 0.4,
+    'band_count': 1000,
+    'band_size_range': (0.05, 0.8),
+    'band_alpha': 0.3,
+    'band_width': 0.3  # Standard deviation for band distribution
+}
+
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # 3. PLANET POSITION CALCULATIONS
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -75,7 +96,6 @@ planets = [Body.Mercury, Body.Venus, Body.Earth, Body.Mars,
 # Convert planet SVG icons to OffsetImages
 def svg_to_imagebox(svg_path, zoom=0.1, color=None):
     """Convert an SVG to a Matplotlib OffsetImage (PNG in memory)."""
-    from matplotlib.colors import hex2color
 
     # Convert color to tuple for caching (None or hex string -> tuple)
     color_key = tuple(hex2color(color)) if color else None
@@ -86,7 +106,6 @@ def svg_to_imagebox(svg_path, zoom=0.1, color=None):
 
     # Colorize if color is provided
     if color is not None:
-        from matplotlib.colors import hex2color
         rgb = hex2color(color)
         mask = image[:, :, :3].mean(axis=2) > 0.5
         for i in range(3):
@@ -163,10 +182,10 @@ else:  # Taller than wide
     star_ylim = (-1.3 / aspect, 1.3 / aspect)
 
 # Generate stars
-np.random.seed(123)
+np.random.seed(RANDOM_SEED)
 
 # Base stars
-num_stars = 200
+num_stars = STARS_CONFIG['base_count']
 star_x = np.random.uniform(star_xlim[0], star_xlim[1], num_stars)
 star_y = np.random.uniform(star_ylim[0], star_ylim[1], num_stars)
 star_sizes = np.random.uniform(0.1, 1.5, num_stars)
@@ -330,7 +349,7 @@ asteroid_belt_inner = mars_r + (jupiter_r - mars_r) * 0.1
 asteroid_belt_outer = mars_r + (jupiter_r - mars_r) * 0.9
 
 # Generate asteroids
-np.random.seed(123)
+np.random.seed(RANDOM_SEED)
 num_asteroids = 7000
 asteroid_angles = np.random.uniform(0, 2 * np.pi, num_asteroids)
 asteroid_radii = np.random.uniform(asteroid_belt_inner, asteroid_belt_outer, num_asteroids)
