@@ -1,6 +1,5 @@
 from astronomy import Time, Body, EclipticLongitude, GeoVector, Observer, SearchRiseSet, Direction, Illumination, SearchMoonPhase, JupiterMoons
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
-from matplotlib import font_manager
 import math
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
@@ -61,6 +60,14 @@ planet_colors = {
 # 3. PLANET POSITION CALCULATIONS
 # ═══════════════════════════════════════════════════════════════════════════
 
+from functools import lru_cache
+
+# Cache for SVG conversions to avoid repeated processing
+@lru_cache(maxsize=128)
+def _svg_to_png_cached(svg_path, color_tuple):
+    """Cached SVG to PNG conversion. Color must be tuple for hashability."""
+    return cairosvg.svg2png(url=svg_path)
+
 # Planet list
 planets = [Body.Mercury, Body.Venus, Body.Earth, Body.Mars,
     Body.Jupiter, Body.Saturn, Body.Uranus, Body.Neptune, Body.Pluto]
@@ -68,28 +75,24 @@ planets = [Body.Mercury, Body.Venus, Body.Earth, Body.Mars,
 # Convert planet SVG icons to OffsetImages
 def svg_to_imagebox(svg_path, zoom=0.1, color=None):
     """Convert an SVG to a Matplotlib OffsetImage (PNG in memory)."""
-    png_bytes = cairosvg.svg2png(url=svg_path)
+    from matplotlib.colors import hex2color
+
+    # Convert color to tuple for caching (None or hex string -> tuple)
+    color_key = tuple(hex2color(color)) if color else None
+    
+    # Get cached PNG bytes
+    png_bytes = _svg_to_png_cached(svg_path, color_key)
     image = mpimg.imread(io.BytesIO(png_bytes), format='png')
 
     # Colorize if color is provided
     if color is not None:
         from matplotlib.colors import hex2color
         rgb = hex2color(color)
-        # Apply color to white pixels (assuming SVGs are white)
-        mask = image[:, :, :3].mean(axis=2) > 0.5  # Find white-ish pixels
+        mask = image[:, :, :3].mean(axis=2) > 0.5
         for i in range(3):
             image[:, :, i] = np.where(mask, rgb[i], image[:, :, i])
 
     return OffsetImage(image, zoom=zoom)
-
-def calculate_dwarf_planet(name, semi_major_axis_au, orbital_period_days, ref_longitude=0):
-    """Calculate position of a dwarf planet using simple orbital mechanics."""
-    ref_epoch = Time.Make(2000, 1, 1, 0, 0, 0)
-    days_since_epoch = utc.ut - ref_epoch.ut
-    mean_motion = 360 / orbital_period_days
-    L = (ref_longitude + mean_motion * days_since_epoch) % 360
-    theta = math.radians(-(0 - L))
-    return L, theta
 
 # Get current time
 if custom_date is None or custom_date == "Now":
@@ -108,6 +111,11 @@ else:
 # Calculate longitudes (angles from the Sun)
 longitudes = {planet.name: EclipticLongitude(planet, utc) for planet in planets}
 
+def longitude_to_theta(longitude):
+    """Convert ecliptic longitude to plotting angle (radians)."""
+    L = longitude % 360
+    theta_deg = 0 - L
+    return math.radians(-theta_deg)
 
 
 
@@ -155,7 +163,7 @@ else:  # Taller than wide
     star_ylim = (-1.3 / aspect, 1.3 / aspect)
 
 # Generate stars
-np.random.seed(12345)
+np.random.seed(123)
 
 # Base stars
 num_stars = 200
@@ -215,9 +223,7 @@ ax.add_artist(sun_ab)
 
 # Planets and Dwarf Planets
 for name, L in longitudes.items():
-    L = L % 360
-    theta_deg = 0 - L
-    theta = math.radians(-theta_deg)
+    theta = longitude_to_theta(L)
     r = planet_radii.get(name, 1)
     x = cx + r * math.cos(theta)
     y = cy + r * math.sin(theta)
@@ -238,7 +244,6 @@ for name, L in longitudes.items():
         image = mpimg.imread(io.BytesIO(png_bytes), format='png')
         
         # Black areas (landmasses) → green, White pixels (ocean) → blue
-        from matplotlib.colors import hex2color
         ocean_rgb = hex2color(planet_colors['Earth_ocean'])
         land_rgb = hex2color(planet_colors['Earth_land'])
         
@@ -282,10 +287,8 @@ for planet in planets:
     r = planet_radii.get(name, 1)
     
     # Calculate current position
-    L = longitudes[name] % 360
-    theta_deg = 0 - L
-    current_theta = math.radians(-theta_deg)
-    
+    current_theta = longitude_to_theta(longitudes[name])
+
     # Calculate what fraction of orbit to show based on trail_days
     period = orbital_periods[name]
     arc_fraction = trail_days / period
@@ -451,9 +454,7 @@ trojan_cloud(jupiter_r, jupiter_L, -60)   # L5
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Jupiter's moons
-jupiter_L = longitudes['Jupiter'] % 360
-jupiter_theta_deg = 0 - jupiter_L
-jupiter_theta = math.radians(-jupiter_theta_deg)
+jupiter_theta = longitude_to_theta(longitudes['Jupiter'])
 jupiter_x = cx + jupiter_r * math.cos(jupiter_theta)
 jupiter_y = cy + jupiter_r * math.sin(jupiter_theta)
 
@@ -567,9 +568,7 @@ for i in range(len(arc_x) - 1):
             color='white', alpha=alphas[i], linewidth=1.0)
 
 # Neptune's moon Triton
-neptune_L = longitudes['Neptune'] % 360
-neptune_theta_deg = 0 - neptune_L
-neptune_theta = math.radians(-neptune_theta_deg)
+neptune_theta = longitude_to_theta(longitudes['Neptune'])
 neptune_r_plot = planet_radii['Neptune']
 neptune_x = cx + neptune_r_plot * math.cos(neptune_theta)
 neptune_y = cy + neptune_r_plot * math.sin(neptune_theta)
@@ -578,7 +577,9 @@ triton_epoch_angle = 2.733989
 triton_period = 5.877
 triton_orbit_r = 0.08
 
-days_since_epoch = utc.ut - 2460676.5
+# Reference epoch: January 1, 2025, 00:00 UTC (JD 2460676.5)
+epoch_jd_2025 = 2460676.5
+days_since_epoch = utc.ut - epoch_jd_2025
 
 triton_angle = (triton_epoch_angle - (days_since_epoch / triton_period * 360)) % 360
 triton_theta = math.radians(-(0 - triton_angle))
@@ -610,9 +611,7 @@ for i in range(len(t_arc_x) - 1):
             color=triton_color, alpha=alphas[i], linewidth=0.7)
 
 # Saturn's moons
-saturn_L = longitudes['Saturn'] % 360
-saturn_theta_deg = 0 - saturn_L
-saturn_theta = math.radians(-saturn_theta_deg)
+saturn_theta = longitude_to_theta(longitudes['Saturn'])
 saturn_r = planet_radii['Saturn']
 saturn_x = cx + saturn_r * math.cos(saturn_theta)
 saturn_y = cy + saturn_r * math.sin(saturn_theta)
@@ -678,9 +677,7 @@ for moon_name, data in saturn_moon_data.items():
                 color=moon_color, alpha=alphas[i], linewidth=0.8)
 
 # Uranus's moons
-uranus_L = longitudes['Uranus'] % 360
-uranus_theta_deg = 0 - uranus_L
-uranus_theta = math.radians(-uranus_theta_deg)
+uranus_theta = longitude_to_theta(longitudes['Uranus'])
 uranus_r = planet_radii['Uranus']
 uranus_x = cx + uranus_r * math.cos(uranus_theta)
 uranus_y = cy + uranus_r * math.sin(uranus_theta)
@@ -738,13 +735,11 @@ for moon_name, data in uranus_moon_data.items():
                 color=moon_color, alpha=alphas[i], linewidth=0.7)
 
 # Dwarf Planet Ceres
-ceres_epoch_jd = 2460676.5   # Jan 1 2025
 ceres_L_epoch = 315.17       # Orbital Longitude on this date
 ceres_mean_motion = 0.21387  # Degrees per day
 
-# Calculate current position relative to 2025 epoch
-days_since_ceres_epoch = utc.ut - ceres_epoch_jd
-ceres_L = (ceres_L_epoch + ceres_mean_motion * days_since_ceres_epoch) % 360
+# Calculate current position
+ceres_L = (ceres_L_epoch + ceres_mean_motion * days_since_epoch) % 360
 ceres_theta = math.radians(-(0 - ceres_L))
 
 # Plot Ceres
@@ -855,14 +850,14 @@ if show_info_text:
         phase_name = "Täysikuu"  # "Full moon"
     elif illumination < 0.01:
         phase_name = "Uusikuu"  # "New moon"
-    elif is_waxing: # Waxing
+    elif is_waxing: # Waxing, growing brighter
         if illumination > 0.55:
             phase_name = "Kasvava kupera kuu"  # "Waxing gibbous"
         elif illumination > 0.45:
             phase_name = "Puolikuu (ensimmäinen neljännes)"  # "First quarter"
         else:
             phase_name = "Kasvava sirppi"  # "Waxing crescent"
-    else:  # Waning
+    else:  # Waning, getting darker
         if illumination > 0.55:
             phase_name = "Vähenevä kupera kuu"  # "Waning gibbous"
         elif illumination > 0.45:
