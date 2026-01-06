@@ -1,6 +1,7 @@
 from astronomy import Time, Body, EclipticLongitude, GeoVector, Observer, SearchRiseSet, Direction, Illumination, SearchMoonPhase, JupiterMoons
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from matplotlib.colors import hex2color
+from zoneinfo import ZoneInfo
 import math
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
@@ -154,6 +155,11 @@ fig, ax = plt.subplots(figsize=(1, 1))
 fig.set_size_inches(width_px/dpi, height_px/dpi)
 fig.patch.set_facecolor('black')
 ax.set_facecolor('black')
+
+# Cache figure dimensions for reuse
+fig_width, fig_height = fig.get_size_inches()
+fig_aspect = fig_width / fig_height
+
 cx, cy = 0, 0
 r_base = 0.80  # Ring radius base unit, change for bigger/smaller rings
 
@@ -172,9 +178,8 @@ cy = cy + cy_offset
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Calculate aspect-aware limits for stars
-fig_width, fig_height = fig.get_size_inches()
 aspect = fig_width / fig_height
-if aspect > 1:  # Wider than tall
+if fig_aspect > 1:  # Wider than tall
     star_xlim = (-1.3 * aspect, 1.3 * aspect)
     star_ylim = (-1.3, 1.3)
 else:  # Taller than wide
@@ -192,7 +197,7 @@ star_sizes = np.random.uniform(0.1, 1.5, num_stars)
 ax.scatter(star_x, star_y, s=star_sizes, c='white', alpha=0.4, marker='.')
 
 # Dense band
-band_stars = 1000
+band_stars = STARS_CONFIG['band_count']
 band_x = np.random.uniform(star_xlim[0], star_xlim[1], band_stars)
 band_y = np.random.normal(0, 0.3, band_stars)
 band_sizes = np.random.uniform(0.05, 0.8, band_stars)
@@ -780,10 +785,7 @@ ax.add_artist(AnnotationBbox(ceres_imagebox, (ceres_x, ceres_y), frameon=False))
 ax.set_aspect('equal', 'box')
 
 # Calculate axis limits
-fig_width, fig_height = fig.get_size_inches()
-aspect = fig_width / fig_height
-
-if aspect > 1:  # Wider than tall
+if fig_aspect > 1:  # Wider than tall
     ax.set_xlim(-1.3 * aspect, 1.3 * aspect)
     ax.set_ylim(-1.3, 1.3)
 else:  # Taller than wide
@@ -801,10 +803,7 @@ ax.axis('off')
 
 if show_info_text:
     # Calculate text position (bottom right with taskbar offset)
-    fig_width, fig_height = fig.get_size_inches()
-    aspect = fig_width / fig_height
-
-    if aspect > 1:
+    if fig_aspect > 1:
         text_x = 1.3 * aspect - 0.07
         text_y = -1.2 + (taskbar_offset * 2.6)
     else:
@@ -815,37 +814,35 @@ if show_info_text:
     latitude = 60.06977
     longitude = 23.66283
 
+    # Convert astronomy Time to Python datetime in UTC
+    cal = [int(x) for x in utc.Calendar()[:6]]
+    dt_utc = datetime.datetime(*cal, tzinfo=datetime.timezone.utc)
+
+    # Convert to Finland time (handles DST automatically)
+    dt_local = dt_utc.astimezone(ZoneInfo('Europe/Helsinki'))
+
     # Get sunrise and sunset for today
     observer = Observer(latitude, longitude, 0)
     sunrise_time_obj = SearchRiseSet(Body.Sun, observer, Direction.Rise, utc, 1)
     sunset_time_obj = SearchRiseSet(Body.Sun, observer, Direction.Set, utc, 1)
 
     # Convert to local time
-    # (Finland is UTC+2, except between last Sunday in March to last Sunday in October UTC+3)
-    cal = [int(x) for x in utc.Calendar()[:6]]
-    dt = datetime.datetime(*cal)
-    last_sun = lambda m: 31 - (dt.replace(month=m, day=31).weekday() + 1) % 7
-    local_offset_hours = 3 if (3 < dt.month < 10 or 
-        (dt.month == 3 and dt.day >= last_sun(3)) or 
-        (dt.month == 10 and dt.day < last_sun(10))) else 2
-
-    # Use Calendar() to get datetime components (returns tuple: year, month, day, hour, minute, second)
     sunrise_cal = sunrise_time_obj.Calendar()
     sunset_cal = sunset_time_obj.Calendar()
 
-    sunrise_hour = (sunrise_cal[3] + local_offset_hours) % 24
-    sunrise_minute = sunrise_cal[4]
+    sunrise_utc = datetime.datetime(*[int(x) for x in sunrise_cal[:6]], tzinfo=datetime.timezone.utc)
+    sunset_utc = datetime.datetime(*[int(x) for x in sunset_cal[:6]], tzinfo=datetime.timezone.utc)
 
-    sunset_hour = (sunset_cal[3] + local_offset_hours) % 24
-    sunset_minute = sunset_cal[4]
+    sunrise_local = sunrise_utc.astimezone(ZoneInfo('Europe/Helsinki'))
+    sunset_local = sunset_utc.astimezone(ZoneInfo('Europe/Helsinki'))
 
-    sunrise_time = f"{sunrise_hour}:{sunrise_minute:02d}"
-    sunset_time = f"{sunset_hour}:{sunset_minute:02d}"
+    sunrise_time = f"{sunrise_local.hour}:{sunrise_local.minute:02d}"
+    sunset_time = f"{sunset_local.hour}:{sunset_local.minute:02d}"
 
     # Calculate daylight hours
-    daylight_minutes = (sunset_hour * 60 + sunset_minute) - (sunrise_hour * 60 + sunrise_minute)
-    daylight_hours = daylight_minutes // 60
-    daylight_mins = daylight_minutes % 60
+    daylight_duration = sunset_local - sunrise_local
+    daylight_hours = daylight_duration.seconds // 3600
+    daylight_mins = (daylight_duration.seconds % 3600) // 60
 
 
 
