@@ -573,17 +573,18 @@ theta_end = math.radians(-(current_moon_theta_deg + arc_span))
 
 plot_fading_arc(ax, earth_x, earth_y, earth_ring_r, theta_start, theta_end, 'white', linewidth=1.0)
 
-# Triton trail (retrograde)
-triton_trail_fraction = 1/2
-arc_span = 360 * triton_trail_fraction
+# Neptune's moon Triton
+neptune_L = longitudes['Neptune']
+neptune_theta = longitude_to_theta(neptune_L)
+neptune_r_plot = planet_radii['Neptune']
+neptune_x = cx + neptune_r_plot * math.cos(neptune_theta)
+neptune_y = cy + neptune_r_plot * math.sin(neptune_theta)
 
-theta_start = triton_theta
-theta_end = triton_theta + math.radians(arc_span)
+triton_epoch_angle = 2.733989
+triton_period = 5.877
+triton_orbit_r = 0.08
 
-plot_fading_arc(ax, neptune_x, neptune_y, triton_orbit_r, theta_start, theta_end, triton_color, linewidth=0.7)
-
-# Reference epoch: January 1, 2025, 00:00 UTC (JD 2460676.5)
-epoch_jd_2025 = 2460676.5
+epoch_jd_2025 = 2460676.5 # Reference epoch: January 1, 2025, 00:00 UTC (JD 2460676.5)
 days_since_epoch = utc.ut - epoch_jd_2025
 
 triton_angle = (triton_epoch_angle - (days_since_epoch / triton_period * 360)) % 360
@@ -595,6 +596,15 @@ triton_y = neptune_y + triton_orbit_r * math.sin(triton_theta)
 triton_color = '#E6E6FA'
 triton_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.09, color=triton_color)
 ax.add_artist(AnnotationBbox(triton_imagebox, (triton_x, triton_y), frameon=False))
+
+# Triton trail (retrograde)
+triton_trail_fraction = 1/2
+arc_span = 360 * triton_trail_fraction
+
+theta_start = triton_theta
+theta_end = triton_theta + math.radians(arc_span)
+
+plot_fading_arc(ax, neptune_x, neptune_y, triton_orbit_r, theta_start, theta_end, triton_color, linewidth=0.7)
 
 # Saturn's moons
 saturn_theta = longitude_to_theta(longitudes['Saturn'])
