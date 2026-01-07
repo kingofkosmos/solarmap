@@ -1,7 +1,9 @@
 from astronomy import Time, Body, EclipticLongitude, GeoVector, Observer, SearchRiseSet, Direction, Illumination, SearchMoonPhase, JupiterMoons
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from matplotlib.colors import hex2color
+from functools import lru_cache
 from zoneinfo import ZoneInfo
+from PIL import Image
 import math
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
@@ -82,7 +84,19 @@ STARS_CONFIG = {
 # 3. PLANET POSITION CALCULATIONS
 # ═══════════════════════════════════════════════════════════════════════════
 
-from functools import lru_cache
+def plot_fading_arc(ax, cx, cy, r, theta_start, theta_end, color, linewidth=1.0, n=50, alpha_start=0.6, alpha_end=0.0):
+    """Plot an arc with fading alpha from start to end."""
+    theta_range = np.linspace(theta_start, theta_end, n)
+    
+    arc_x = cx + r * np.cos(theta_range)
+    arc_y = cy + r * np.sin(theta_range)
+    
+    alphas = np.linspace(alpha_start, alpha_end, n)
+    
+    for i in range(n - 1):
+        ax.plot([arc_x[i], arc_x[i+1]], 
+                [arc_y[i], arc_y[i+1]], 
+                color=color, alpha=alphas[i], linewidth=linewidth)
 
 # Cache for SVG conversions to avoid repeated processing
 @lru_cache(maxsize=128)
@@ -322,23 +336,11 @@ for planet in planets:
     theta_start = current_theta
     theta_end = current_theta - math.radians(arc_span)
     
-    # Generate arc points
-    theta_range = np.linspace(theta_start, theta_end, 100)
-    
-    arc_x = cx + r * np.cos(theta_range)
-    arc_y = cy + r * np.sin(theta_range)
-    
-    # Plot trail with fading alpha
-    num_points = len(arc_x)
-    alphas = np.linspace(0.6, 0, num_points)
-    
     # Get trail color
     trail_color = planet_colors['Earth_ocean'] if name == 'Earth' else planet_colors.get(name, 'white')
 
-    for i in range(num_points - 1):
-        ax.plot([arc_x[i], arc_x[i+1]], 
-            [arc_y[i], arc_y[i+1]], 
-            color=trail_color, alpha=alphas[i], linewidth=1.5)
+    # Plot trail
+    plot_fading_arc(ax, cx, cy, r, theta_start, theta_end, trail_color, linewidth=1.5, n=100)
 
 
 
@@ -543,18 +545,8 @@ for moon_name, moon_vec in moon_data.items():
     theta_start = math.radians(-current_theta_deg)
     theta_end = math.radians(-(current_theta_deg + arc_span))
     
-    theta_range = np.linspace(theta_start, theta_end, 50)
-    
-    arc_x = jupiter_x + r * np.cos(theta_range)
-    arc_y = jupiter_y + r * np.sin(theta_range)
-    
-    alphas = np.linspace(0.6, 0, len(theta_range))
-    
-    for i in range(len(arc_x) - 1):
-        ax.plot([arc_x[i], arc_x[i+1]], 
-                [arc_y[i], arc_y[i+1]], 
-                color=moon_color, alpha=alphas[i], linewidth=0.8)
-        
+    plot_fading_arc(ax, jupiter_x, jupiter_y, r, theta_start, theta_end, moon_color, linewidth=0.8)
+
 # Earth's Moon
 moon_ring_size = 250
 earth_ring_r = 0.06
@@ -579,27 +571,16 @@ arc_span = 360 * moon_trail_fraction
 theta_start = math.radians(-current_moon_theta_deg)
 theta_end = math.radians(-(current_moon_theta_deg + arc_span))
 
-theta_range = np.linspace(theta_start, theta_end, 50)
+plot_fading_arc(ax, earth_x, earth_y, earth_ring_r, theta_start, theta_end, 'white', linewidth=1.0)
 
-arc_x = earth_x + earth_ring_r * np.cos(theta_range)
-arc_y = earth_y + earth_ring_r * np.sin(theta_range)
+# Triton trail (retrograde)
+triton_trail_fraction = 1/2
+arc_span = 360 * triton_trail_fraction
 
-alphas = np.linspace(0.6, 0, len(theta_range))
+theta_start = triton_theta
+theta_end = triton_theta + math.radians(arc_span)
 
-for i in range(len(arc_x) - 1):
-    ax.plot([arc_x[i], arc_x[i+1]], 
-            [arc_y[i], arc_y[i+1]], 
-            color='white', alpha=alphas[i], linewidth=1.0)
-
-# Neptune's moon Triton
-neptune_theta = longitude_to_theta(longitudes['Neptune'])
-neptune_r_plot = planet_radii['Neptune']
-neptune_x = cx + neptune_r_plot * math.cos(neptune_theta)
-neptune_y = cy + neptune_r_plot * math.sin(neptune_theta)
-
-triton_epoch_angle = 2.733989
-triton_period = 5.877
-triton_orbit_r = 0.08
+plot_fading_arc(ax, neptune_x, neptune_y, triton_orbit_r, theta_start, theta_end, triton_color, linewidth=0.7)
 
 # Reference epoch: January 1, 2025, 00:00 UTC (JD 2460676.5)
 epoch_jd_2025 = 2460676.5
@@ -614,25 +595,6 @@ triton_y = neptune_y + triton_orbit_r * math.sin(triton_theta)
 triton_color = '#E6E6FA'
 triton_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.09, color=triton_color)
 ax.add_artist(AnnotationBbox(triton_imagebox, (triton_x, triton_y), frameon=False))
-
-# Triton trail (retrograde)
-triton_trail_fraction = 1/2
-arc_span = 360 * triton_trail_fraction
-
-theta_start = triton_theta
-theta_end = triton_theta + math.radians(arc_span)
-
-theta_range = np.linspace(theta_start, theta_end, 50)
-
-t_arc_x = neptune_x + triton_orbit_r * np.cos(theta_range)
-t_arc_y = neptune_y + triton_orbit_r * np.sin(theta_range)
-
-alphas = np.linspace(0.6, 0, len(theta_range))
-
-for i in range(len(t_arc_x) - 1):
-    ax.plot([t_arc_x[i], t_arc_x[i+1]], 
-            [t_arc_y[i], t_arc_y[i+1]], 
-            color=triton_color, alpha=alphas[i], linewidth=0.7)
 
 # Saturn's moons
 saturn_theta = longitude_to_theta(longitudes['Saturn'])
@@ -688,17 +650,7 @@ for moon_name, data in saturn_moon_data.items():
     theta_start = math.radians(-current_theta_deg)
     theta_end = math.radians(-(current_theta_deg + arc_span))
     
-    theta_range = np.linspace(theta_start, theta_end, 50)
-    
-    arc_x = saturn_x + data['orbit_r'] * np.cos(theta_range)
-    arc_y = saturn_y + data['orbit_r'] * np.sin(theta_range)
-    
-    alphas = np.linspace(0.6, 0, len(theta_range))
-    
-    for i in range(len(arc_x) - 1):
-        ax.plot([arc_x[i], arc_x[i+1]], 
-                [arc_y[i], arc_y[i+1]], 
-                color=moon_color, alpha=alphas[i], linewidth=0.8)
+    plot_fading_arc(ax, saturn_x, saturn_y, data['orbit_r'], theta_start, theta_end, moon_color, linewidth=0.8)
 
 # Uranus's moons
 uranus_theta = longitude_to_theta(longitudes['Uranus'])
@@ -746,17 +698,7 @@ for moon_name, data in uranus_moon_data.items():
     theta_start = math.radians(-current_theta_deg)
     theta_end = math.radians(-(current_theta_deg + arc_span))
     
-    theta_range = np.linspace(theta_start, theta_end, 50)
-    
-    arc_x = uranus_x + data['orbit_r'] * np.cos(theta_range)
-    arc_y = uranus_y + data['orbit_r'] * np.sin(theta_range)
-    
-    alphas = np.linspace(0.6, 0, len(theta_range))
-    
-    for i in range(len(arc_x) - 1):
-        ax.plot([arc_x[i], arc_x[i+1]], 
-                [arc_y[i], arc_y[i+1]], 
-                color=moon_color, alpha=alphas[i], linewidth=0.7)
+    plot_fading_arc(ax, uranus_x, uranus_y, data['orbit_r'], theta_start, theta_end, moon_color, linewidth=0.7)
 
 # Dwarf Planet Ceres
 ceres_L_epoch = 315.17       # Orbital Longitude on this date
@@ -774,6 +716,7 @@ ceres_y = cy + ceres_r * math.sin(ceres_theta)
 
 ceres_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.05, color='#A0826D')
 ax.add_artist(AnnotationBbox(ceres_imagebox, (ceres_x, ceres_y), frameon=False))
+
 
 
 
@@ -974,7 +917,6 @@ overscan = 1.04  # 4 % extra on each side
 temp_dpi = int(dpi * supersample_final * overscan)
 
 # Save to memory buffer instead of file
-from PIL import Image
 buffer = io.BytesIO()
 fig.savefig(buffer, format='png', dpi=temp_dpi)
 buffer.seek(0)
