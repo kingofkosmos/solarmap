@@ -198,15 +198,17 @@ np.random.seed(RANDOM_SEED)
 num_stars = STARS_CONFIG['base_count']
 star_x = np.random.uniform(star_xlim[0], star_xlim[1], num_stars)
 star_y = np.random.uniform(star_ylim[0], star_ylim[1], num_stars)
-star_sizes = np.random.uniform(0.1, 1.5, num_stars)
-ax.scatter(star_x, star_y, s=star_sizes, c='white', alpha=0.4, marker='.')
+base_min, base_max = STARS_CONFIG['base_size_range']
+star_sizes = np.random.uniform(base_min, base_max, num_stars)
+ax.scatter(star_x, star_y, s=star_sizes, c='white', alpha=STARS_CONFIG['base_alpha'], marker='.')
 
 # Dense band
 band_stars = STARS_CONFIG['band_count']
 band_x = np.random.uniform(star_xlim[0], star_xlim[1], band_stars)
-band_y = np.random.normal(0, 0.3, band_stars)
-band_sizes = np.random.uniform(0.05, 0.8, band_stars)
-ax.scatter(band_x, band_y, s=band_sizes, c='white', alpha=0.3, marker='.')
+band_y = np.random.normal(0, STARS_CONFIG['band_width'], band_stars)
+band_min, band_max = STARS_CONFIG['band_size_range']
+band_sizes = np.random.uniform(band_min, band_max, band_stars)
+ax.scatter(band_x, band_y, s=band_sizes, c='white', alpha=STARS_CONFIG['band_alpha'], marker='.')
 
 
 
