@@ -100,23 +100,14 @@ def plot_fading_arc(ax, cx, cy, r, theta_start, theta_end, color, linewidth=1.0,
 
 # Cache for SVG conversions to avoid repeated processing
 @lru_cache(maxsize=128)
-def _svg_to_png_cached(svg_path, color_tuple):
-    """Cached SVG to PNG conversion. Color must be tuple for hashability."""
+def _svg_to_png_cached(svg_path):
+    """Cached SVG to PNG conversion."""
     return cairosvg.svg2png(url=svg_path)
 
-# Planet list
-planets = [Body.Mercury, Body.Venus, Body.Earth, Body.Mars,
-    Body.Jupiter, Body.Saturn, Body.Uranus, Body.Neptune, Body.Pluto]
-
-# Convert planet SVG icons to OffsetImages
 def svg_to_imagebox(svg_path, zoom=0.1, color=None):
     """Convert an SVG to a Matplotlib OffsetImage (PNG in memory)."""
-
-    # Convert color to tuple for caching (None or hex string -> tuple)
-    color_key = tuple(hex2color(color)) if color else None
-    
-    # Get cached PNG bytes
-    png_bytes = _svg_to_png_cached(svg_path, color_key)
+    # Get cached PNG bytes (color-independent)
+    png_bytes = _svg_to_png_cached(svg_path)
     image = mpimg.imread(io.BytesIO(png_bytes), format='png')
 
     # Colorize if color is provided
@@ -770,9 +761,6 @@ if show_info_text:
     # Convert astronomy Time to Python datetime in UTC
     cal = [int(x) for x in utc.Calendar()[:6]]
     dt_utc = datetime.datetime(*cal, tzinfo=datetime.timezone.utc)
-
-    # Convert to Finland time (handles DST automatically)
-    dt_local = dt_utc.astimezone(ZoneInfo('Europe/Helsinki'))
 
     # Get sunrise and sunset for today
     observer = Observer(latitude, longitude, 0)
