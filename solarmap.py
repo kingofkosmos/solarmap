@@ -133,6 +133,11 @@ else:
     year, month, day = map(int, custom_date.split('-'))
     utc = Time.Make(year, month, day, 0, 0, 0)
 
+# Planet list
+planets = [Body.Mercury, Body.Venus, Body.Earth, Body.Mars,
+    Body.Jupiter, Body.Saturn, Body.Uranus, Body.Neptune, Body.Pluto]
+
+
 # Calculate longitudes (angles from the Sun)
 longitudes = {planet.name: EclipticLongitude(planet, utc) for planet in planets}
 
