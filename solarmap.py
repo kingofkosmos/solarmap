@@ -19,14 +19,13 @@ import datetime
 # 1. TO-DO LIST
 # ═══════════════════════════════════════════════════════════════════════════
 
-#TODO: Weather info? (requires internet access)
-##      Previous day temperature average
-##      Forecast high/low for next day
+#TODO: Weather info
+##      Northern lights forecast?
 #TODO: Comets (Halley, Hale-Bopp)
 #TODO: Arguments for command line usage
 #TODO: Realistic elliptical orbits (enables rest of the dwarf planets & astrology)
-## Astrology: Sky division to constellations, meanings of planets in different constellations
-## Dwarf planets: Haumea, Makemake, Eris
+##      Astrology: Sky division to constellations, meanings of planets in different constellations
+##      Dwarf planets: Haumea, Makemake, Eris
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -35,6 +34,10 @@ import datetime
 
 # Bottom right text toggle
 show_info_text = True  # Set to False to hide info text
+
+# Geolocation coordinates for weather forecast, moon phase and rise/set times
+latitude = 60.06977
+longitude = 23.66283
 
 # Custom time input
 custom_date = "Now"  # Options: None, "Now", "YYYY-MM-DD", or "YYYY-MM-DD HH:MM"
@@ -119,6 +122,67 @@ def svg_to_imagebox(svg_path, zoom=0.1, color=None):
 
     return OffsetImage(image, zoom=zoom)
 
+
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 4. WEATHER FORECAST FROM FMI (ONLINE)
+# ═══════════════════════════════════════════════════════════════════════════
+
+def get_tomorrow_forecast(lat, lon):
+    """Get tomorrow's min/max/avg temperature from FMI."""
+    import requests
+    import xml.etree.ElementTree as ET
+    from datetime import datetime, timedelta
+    
+    tomorrow = datetime.now() + timedelta(days=1)
+    start_time = tomorrow.replace(hour=0, minute=0).strftime('%Y-%m-%dT%H:%M:%SZ')
+    end_time = tomorrow.replace(hour=23, minute=59).strftime('%Y-%m-%dT%H:%M:%SZ')
+    
+    url = "https://opendata.fmi.fi/wfs"
+    params = {
+        'service': 'WFS',
+        'version': '2.0.0',
+        'request': 'getFeature',
+        'storedquery_id': 'fmi::forecast::harmonie::surface::point::multipointcoverage',
+        'latlon': f'{lat},{lon}',
+        'parameters': 'temperature',
+        'starttime': start_time,
+        'endtime': end_time
+    }
+    
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        print(f"FMI connection status: {response.status_code}")
+        
+        if response.status_code != 200:
+            return None, None, None
+        
+        root = ET.fromstring(response.content)
+        
+        temps = []
+        for elem in root.iter():
+            if 'doubleOrNilReasonTupleList' in elem.tag:
+                values = elem.text.strip().split()
+                temps.extend([float(v) for v in values if v not in ['NaN', '']])
+                print(f"Retrieved {len(temps)} temperature values for tomorrow.")
+
+        if temps:
+            avg_temp = sum(temps) / len(temps)
+            print(f"Tomorrow's temps - Min: {min(temps):+.1f} °C, Max: {max(temps):+.1f} °C, Avg: {avg_temp:+.1f} °C")
+            return min(temps), max(temps), avg_temp
+        else:
+            print("No temps found!")
+
+    except Exception as e:
+        print(f"Exception: {e}")
+    
+    return None, None, None
+
+# Get weather forecast
+min_temp, max_temp, avg_temp = get_tomorrow_forecast(latitude, longitude)
+weather_line = f"\nHuomisen sääennuste:\nMin: {min_temp:+.1f} °C Maks: {max_temp:+.1f} °C\nKa: {avg_temp:+.1f} °C\n" if min_temp is not None else ""
+
 # Get current time
 if custom_date is None or custom_date == "Now":
     utc = Time.Now()
@@ -150,7 +214,7 @@ def longitude_to_theta(longitude):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 4. CANVAS INITIALIZATION
+# 5. CANVAS INITIALIZATION
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Set wallpaper resolution
@@ -184,7 +248,7 @@ cy = cy + cy_offset
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 5. BACKGROUND STARS
+# 6. BACKGROUND STARS
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Calculate aspect-aware limits for stars
@@ -219,7 +283,7 @@ ax.scatter(band_x, band_y, s=band_sizes, c='white', alpha=STARS_CONFIG['band_alp
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 6. PLANETARY RINGS AND RADII
+# 7. PLANETARY RINGS AND RADII
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Rings
@@ -248,7 +312,7 @@ planet_radii = {p.name: rings[i] for i, p in enumerate(planets)}
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 7. PLOTTING PLANETS AND OBJECTS
+# 8. PLOTTING PLANETS AND OBJECTS
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Sun
@@ -344,7 +408,7 @@ for planet in planets:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 8. ASTEROIDS
+# 9. ASTEROIDS
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Asteroid belt between Mars and Jupiter
@@ -394,7 +458,7 @@ ax.scatter(asteroid_x, asteroid_y, s=asteroid_sizes, c=asteroid_colors, alpha=as
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 8.1 KUIPER BELT
+# 9.1 KUIPER BELT
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Ranges for Kuiper belt
@@ -432,7 +496,7 @@ ax.scatter(kuiper_x, kuiper_y, s=kuiper_sizes, c=kuiper_colors,
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 8.2 JUPITER TROJANS
+# 9.2 JUPITER TROJANS
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Jupiter Trojans - get Jupiter's position
@@ -474,7 +538,7 @@ trojan_cloud(jupiter_r, jupiter_L, -60)   # L5
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 9. MOONS AND DWARF PLANETS
+# 10. MOONS AND DWARF PLANETS
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Jupiter's moons
@@ -729,7 +793,7 @@ ax.add_artist(AnnotationBbox(ceres_imagebox, (ceres_x, ceres_y), frameon=False))
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 10. CANVAS FINALIZATION
+# 11. CANVAS FINALIZATION
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Limits and aspect
@@ -749,7 +813,7 @@ ax.axis('off')
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 11. BOTTOM RIGHT INFO
+# 12. BOTTOM RIGHT INFO
 # ═══════════════════════════════════════════════════════════════════════════
 
 if show_info_text:
@@ -760,10 +824,6 @@ if show_info_text:
     else:
         text_x = 1.3 - 0.07
         text_y = (-1.3 / aspect) + (taskbar_offset * 2.6) + 0.1
-
-    # Geolocation coordinates
-    latitude = 60.06977
-    longitude = 23.66283
 
     # Convert astronomy Time to Python datetime in UTC
     cal = [int(x) for x in utc.Calendar()[:6]]
@@ -784,8 +844,8 @@ if show_info_text:
     sunrise_local = sunrise_utc.astimezone(ZoneInfo('Europe/Helsinki'))
     sunset_local = sunset_utc.astimezone(ZoneInfo('Europe/Helsinki'))
 
-    sunrise_time = f"{sunrise_local.hour}:{sunrise_local.minute:02d}"
-    sunset_time = f"{sunset_local.hour}:{sunset_local.minute:02d}"
+    sunrise_time = f"{sunrise_local.hour}.{sunrise_local.minute:02d}"
+    sunset_time = f"{sunset_local.hour}.{sunset_local.minute:02d}"
 
     # Calculate daylight hours
     daylight_duration = sunset_local - sunrise_local
@@ -795,8 +855,14 @@ if show_info_text:
 
 
 
+
+
+
+
+
+
 # ═══════════════════════════════════════════════════════════════════════════
-# 11.1 MOON PHASE
+# 12.1 MOON PHASE
 # ═══════════════════════════════════════════════════════════════════════════
 
     # Get moon phase info
@@ -829,9 +895,34 @@ if show_info_text:
         else:
             phase_name = "Vähenevä sirppi"  # "Waning crescent"
 
-    # Position for moon phase circle
+    # Search for next full moon (phase 180°) within next 30 days
+    next_full_moon = SearchMoonPhase(180, utc, 30)
+    days_to_full = next_full_moon.ut - utc.ut  # Difference in days
+
+
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 12.2 PLOT INFO TEXT
+# ═══════════════════════════════════════════════════════════════════════════
+
+    info_text = (
+        f"{phase_name}\n"
+        f"{days_to_full:.0f} pv täysikuuhun\n"
+        f"{weather_line}"
+        f"\n"
+        f"Päivänvalo:\n"
+        f"klo {sunrise_time} - {sunset_time}\n"
+        f"{daylight_hours} t {daylight_mins} min"
+    )
+
+    # Count lines to position moon indicator at first line
+    num_lines = info_text.count('\n')+1
+    line_height = 0.047  # Adjust if needed for your text size
+
+    # Position for moon phase circle (aligned with first line)
     moon_indicator_x = text_x - 0.04
-    moon_indicator_y = text_y + 0.24
+    moon_indicator_y = text_y + (num_lines - 1) * line_height  # Top line position
     moon_radius = 0.035
 
     # Draw dark gray base circle
@@ -881,26 +972,7 @@ if show_info_text:
             
             ax.fill(x_lit, y_lit, color='white', alpha=0.9, zorder=11, linewidth=0)
 
-    # Search for next full moon (phase 180°) within next 30 days
-    next_full_moon = SearchMoonPhase(180, utc, 30)
-    days_to_full = next_full_moon.ut - utc.ut  # Difference in days
-
-
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# 11.2 PLOT INFO TEXT
-# ═══════════════════════════════════════════════════════════════════════════
-
-    # Plot text
-    info_text = (
-        f"{phase_name}\n"
-        f"{days_to_full:.0f} pv täysikuuhun\n"
-        f"\n"
-        f"Päivänvalo klo {sunrise_time} - {sunset_time}\n"
-        f"{daylight_hours} t {daylight_mins} min"
-    )
-
+    # Plot info text
     ax.text(text_x, text_y, info_text,
             color='white', fontsize=12,
             ha='right', va='bottom',
@@ -910,7 +982,7 @@ if show_info_text:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 12. FINALIZE AND SAVE IMAGE
+# 13. FINALIZE AND SAVE IMAGE
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Save and show
