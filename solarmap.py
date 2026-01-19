@@ -20,12 +20,15 @@ import datetime
 # ═══════════════════════════════════════════════════════════════════════════
 
 #TODO: Weather info
+##      Rain/sleet/snow chance? Cloudiness? Sun UV strength?
 ##      Northern lights forecast?
 #TODO: Comets (Halley, Hale-Bopp)
 #TODO: Arguments for command line usage
 #TODO: Realistic elliptical orbits (enables rest of the dwarf planets & astrology)
 ##      Astrology: Sky division to constellations, meanings of planets in different constellations
 ##      Dwarf planets: Haumea, Makemake, Eris
+
+
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -80,6 +83,7 @@ STARS_CONFIG = {
     'band_alpha': 0.3,
     'band_width': 0.3  # Standard deviation for band distribution
 }
+
 
 
 
@@ -165,11 +169,9 @@ def get_tomorrow_forecast(lat, lon):
             if 'doubleOrNilReasonTupleList' in elem.tag:
                 values = elem.text.strip().split()
                 temps.extend([float(v) for v in values if v not in ['NaN', '']])
-                print(f"Retrieved {len(temps)} temperature values for tomorrow.")
 
         if temps:
             avg_temp = sum(temps) / len(temps)
-            print(f"Tomorrow's temps - Min: {min(temps):+.1f} °C, Max: {max(temps):+.1f} °C, Avg: {avg_temp:+.1f} °C")
             return min(temps), max(temps), avg_temp
         else:
             print("No temps found!")
@@ -181,7 +183,7 @@ def get_tomorrow_forecast(lat, lon):
 
 # Get weather forecast
 min_temp, max_temp, avg_temp = get_tomorrow_forecast(latitude, longitude)
-weather_line = f"\nHuomisen sääennuste:\nMin: {min_temp:+.1f} °C Maks: {max_temp:+.1f} °C\nKa: {avg_temp:+.1f} °C\n" if min_temp is not None else ""
+weather_line = f"\nHuomisen sää:\nmin: {min_temp:+.1f} °C maks: {max_temp:+.1f} °C\nka: {avg_temp:+.1f} °C\n".replace('.', ',') if min_temp is not None else ""
 
 # Get current time
 if custom_date is None or custom_date == "Now":
@@ -210,6 +212,7 @@ def longitude_to_theta(longitude):
     L = longitude % 360
     theta_deg = 0 - L
     return math.radians(-theta_deg)
+
 
 
 
@@ -610,63 +613,85 @@ for moon_name, moon_vec in moon_data.items():
     plot_fading_arc(ax, jupiter_x, jupiter_y, r, theta_start, theta_end, moon_color, linewidth=0.8)
 
 # Earth's Moon
-moon_ring_size = 250
-earth_ring_r = 0.06
+earth_moon_data = {
+    'Moon': {
+        'orbit_r': 0.06,
+        'color': 'white',
+        'zoom': 0.11,
+        'trail_fraction': 1/2
+    }
+}
 
-moon_vec = GeoVector(Body.Moon, utc, True)
-moon_angle = math.degrees(math.atan2(moon_vec.y, moon_vec.x))
-moon_theta_deg = 0 - moon_angle
-moon_theta = math.radians(-moon_theta_deg)
-moon_x = earth_x + earth_ring_r * math.cos(moon_theta)
-moon_y = earth_y + earth_ring_r * math.sin(moon_theta)
-
-# Plot Earth's Moon
-moon_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.11)
-moon_ab = AnnotationBbox(moon_imagebox, (moon_x, moon_y), frameon=False)
-ax.add_artist(moon_ab)
-
-# Earth's Moon trail
-moon_trail_fraction = 1/2
-current_moon_theta_deg = 0 - moon_angle
-arc_span = 360 * moon_trail_fraction
-
-theta_start = math.radians(-current_moon_theta_deg)
-theta_end = math.radians(-(current_moon_theta_deg + arc_span))
-
-plot_fading_arc(ax, earth_x, earth_y, earth_ring_r, theta_start, theta_end, 'white', linewidth=1.0)
+for moon_name, data in earth_moon_data.items():
+    # Get position from astronomy library
+    moon_vec = GeoVector(Body.Moon, utc, True)
+    moon_angle = math.degrees(math.atan2(moon_vec.y, moon_vec.x))
+    moon_theta_deg = 0 - moon_angle
+    moon_theta = math.radians(-moon_theta_deg)
+    
+    x = earth_x + data['orbit_r'] * math.cos(moon_theta)
+    y = earth_y + data['orbit_r'] * math.sin(moon_theta)
+    
+    # Plot moon
+    imagebox = svg_to_imagebox("icons/moon.svg", zoom=data['zoom'], color=data['color'])
+    ax.add_artist(AnnotationBbox(imagebox, (x, y), frameon=False))
+    
+    # Plot trail
+    arc_span = 360 * data['trail_fraction']
+    theta_start = math.radians(-moon_theta_deg)
+    theta_end = math.radians(-(moon_theta_deg + arc_span))
+    
+    plot_fading_arc(ax, earth_x, earth_y, data['orbit_r'], theta_start, theta_end, data['color'], linewidth=1.0)
 
 # Neptune's moon Triton
-neptune_L = longitudes['Neptune']
-neptune_theta = longitude_to_theta(neptune_L)
+neptune_theta = longitude_to_theta(longitudes['Neptune'])
 neptune_r_plot = planet_radii['Neptune']
 neptune_x = cx + neptune_r_plot * math.cos(neptune_theta)
 neptune_y = cy + neptune_r_plot * math.sin(neptune_theta)
 
-triton_epoch_angle = 2.733989
-triton_period = 5.877
-triton_orbit_r = 0.08
-
 epoch_jd_2025 = 2460676.5 # Reference epoch: January 1, 2025, 00:00 UTC (JD 2460676.5)
 days_since_epoch = utc.ut - epoch_jd_2025
 
-triton_angle = (triton_epoch_angle - (days_since_epoch / triton_period * 360)) % 360
-triton_theta = math.radians(-(0 - triton_angle))
+neptune_moon_data = {
+    'Triton': {
+        'epoch_angle': 2.733989,
+        'period': 5.877,
+        'orbit_r': 0.08,
+        'color': '#E6E6FA',
+        'zoom': 0.09,
+        'trail_fraction': 1/2,
+        'retrograde': True  # Triton orbits backwards
+    }
+}
 
-triton_x = neptune_x + triton_orbit_r * math.cos(triton_theta)
-triton_y = neptune_y + triton_orbit_r * math.sin(triton_theta)
-
-triton_color = '#E6E6FA'
-triton_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.09, color=triton_color)
-ax.add_artist(AnnotationBbox(triton_imagebox, (triton_x, triton_y), frameon=False))
-
-# Triton trail (retrograde)
-triton_trail_fraction = 1/2
-arc_span = 360 * triton_trail_fraction
-
-theta_start = triton_theta
-theta_end = triton_theta + math.radians(arc_span)
-
-plot_fading_arc(ax, neptune_x, neptune_y, triton_orbit_r, theta_start, theta_end, triton_color, linewidth=0.7)
+for moon_name, data in neptune_moon_data.items():
+    # Calculate position (retrograde uses subtraction instead of addition)
+    if data.get('retrograde', False):
+        angle = (data['epoch_angle'] - days_since_epoch / data['period'] * 360) % 360
+    else:
+        angle = (data['epoch_angle'] + days_since_epoch / data['period'] * 360) % 360
+    
+    theta = math.radians(-(0 - angle))
+    
+    x = neptune_x + data['orbit_r'] * math.cos(theta)
+    y = neptune_y + data['orbit_r'] * math.sin(theta)
+    
+    # Plot moon
+    moon_color = data['color']
+    imagebox = svg_to_imagebox("icons/moon.svg", zoom=data['zoom'], color=moon_color)
+    ax.add_artist(AnnotationBbox(imagebox, (x, y), frameon=False))
+    
+    # Plot trail (reverse direction for retrograde)
+    current_theta_deg = 0 - angle
+    arc_span = 360 * data['trail_fraction']
+    
+    theta_start = math.radians(-current_theta_deg)
+    if data.get('retrograde', False):
+        theta_end = math.radians(-(current_theta_deg - arc_span))
+    else:
+        theta_end = math.radians(-(current_theta_deg + arc_span))
+    
+    plot_fading_arc(ax, neptune_x, neptune_y, data['orbit_r'], theta_start, theta_end, moon_color, linewidth=0.7)
 
 # Saturn's moons
 saturn_theta = longitude_to_theta(longitudes['Saturn'])
@@ -906,19 +931,23 @@ if show_info_text:
 # 12.2 PLOT INFO TEXT
 # ═══════════════════════════════════════════════════════════════════════════
 
+    cal = utc.Calendar()
+    date_str = f"{int(cal[0])}-{int(cal[1]):02d}-{int(cal[2]):02d}"
+
     info_text = (
         f"{phase_name}\n"
         f"{days_to_full:.0f} pv täysikuuhun\n"
         f"{weather_line}"
         f"\n"
-        f"Päivänvalo:\n"
+        f"Huomisen päivänvalo:\n"
         f"klo {sunrise_time} - {sunset_time}\n"
-        f"{daylight_hours} t {daylight_mins} min"
+        f"{daylight_hours} t {daylight_mins} min\n"
+        f"({date_str})"
     )
 
     # Count lines to position moon indicator at first line
-    num_lines = info_text.count('\n')+1
-    line_height = 0.047  # Adjust if needed for your text size
+    num_lines = info_text.count('\n')+2
+    line_height = 0.04  # Adjust if needed for your text size
 
     # Position for moon phase circle (aligned with first line)
     moon_indicator_x = text_x - 0.04
