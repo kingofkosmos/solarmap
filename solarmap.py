@@ -499,7 +499,6 @@ ax.scatter(kuiper_x, kuiper_y, s=kuiper_sizes, c=kuiper_colors,
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Jupiter Trojans - get Jupiter's position
-jupiter_r = planet_radii['Jupiter']
 jupiter_L = longitudes['Jupiter'] % 360
 
 def trojan_cloud(jupiter_r, jupiter_L, offset_deg, n=700):
@@ -802,7 +801,7 @@ ceres_theta = math.radians(-(0 - ceres_L))
 
 # Plot Ceres
 # Visual radius placed between Mars and Jupiter for clarity
-ceres_r = (planet_radii['Mars'] + planet_radii['Jupiter']) / 2  
+ceres_r = (mars_r + jupiter_r) / 2  
 ceres_x = cx + ceres_r * math.cos(ceres_theta)
 ceres_y = cy + ceres_r * math.sin(ceres_theta)
 
