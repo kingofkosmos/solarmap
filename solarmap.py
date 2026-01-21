@@ -19,6 +19,9 @@ import datetime
 # 1. TO-DO LIST
 # ═══════════════════════════════════════════════════════════════════════════
 
+#TODO: Mask stars within rings
+#TODO: Remove matplotlib plot
+#TODO: Automatic wallpaper generation in Github Actions?
 #TODO: Weather info
 ##      Rain/sleet/snow chance? Cloudiness? Sun UV strength?
 ##      Northern lights forecast?
@@ -251,7 +254,42 @@ cy = cy + cy_offset
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 6. PLANETARY RINGS AND STAR FIELD
+# 6. BACKGROUND STARS
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Calculate aspect-aware limits for stars
+aspect = fig_width / fig_height
+if fig_aspect > 1:  # Wider than tall
+    star_xlim = (-1.3 * aspect, 1.3 * aspect)
+    star_ylim = (-1.3, 1.3)
+else:  # Taller than wide
+    star_xlim = (-1.3, 1.3)
+    star_ylim = (-1.3 / aspect, 1.3 / aspect)
+
+# Generate stars
+np.random.seed(RANDOM_SEED)
+
+# Base stars
+num_stars = STARS_CONFIG['base_count']
+star_x = np.random.uniform(star_xlim[0], star_xlim[1], num_stars)
+star_y = np.random.uniform(star_ylim[0], star_ylim[1], num_stars)
+base_min, base_max = STARS_CONFIG['base_size_range']
+star_sizes = np.random.uniform(base_min, base_max, num_stars)
+ax.scatter(star_x, star_y, s=star_sizes, c='white', alpha=STARS_CONFIG['base_alpha'], marker='.')
+
+# Dense band
+band_stars = STARS_CONFIG['band_count']
+band_x = np.random.uniform(star_xlim[0], star_xlim[1], band_stars)
+band_y = np.random.normal(0, STARS_CONFIG['band_width'], band_stars)
+band_min, band_max = STARS_CONFIG['band_size_range']
+band_sizes = np.random.uniform(band_min, band_max, band_stars)
+ax.scatter(band_x, band_y, s=band_sizes, c='white', alpha=STARS_CONFIG['band_alpha'], marker='.')
+
+
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 7. PLANETARY RINGS AND RADII
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Rings
@@ -276,43 +314,11 @@ for i, r in enumerate(rings[:-1]):  # All rings except the last one
 # Radii for each planet
 planet_radii = {p.name: rings[i] for i, p in enumerate(planets)}
 
-# Generate stars
-np.random.seed(RANDOM_SEED)
-
-# Calculate Neptune's radius (will be defined later as rings[7])
-neptune_r = planet_radii['Neptune']
-
-# Base stars
-num_stars = STARS_CONFIG['base_count']
-star_x = np.random.uniform(star_xlim[0], star_xlim[1], num_stars)
-star_y = np.random.uniform(star_ylim[0], star_ylim[1], num_stars)
-
-# Filter out stars inside Neptune's orbit
-star_distances = np.sqrt((star_x - cx)**2 + (star_y - cy)**2)
-mask = star_distances > neptune_r * 1.05
-star_x = star_x[mask]
-star_y = star_y[mask]
-star_sizes = np.random.uniform(base_min, base_max, len(star_x))
-ax.scatter(star_x, star_y, s=star_sizes, c='white', alpha=STARS_CONFIG['base_alpha'], marker='.')
-
-# Dense band
-band_stars = STARS_CONFIG['band_count']
-band_x = np.random.uniform(star_xlim[0], star_xlim[1], band_stars)
-band_y = np.random.normal(0, STARS_CONFIG['band_width'], band_stars)
-
-# Filter out band stars inside Neptune's orbit
-band_distances = np.sqrt((band_x - cx)**2 + (band_y - cy)**2)
-band_mask = band_distances > neptune_r * 1.05
-band_x = band_x[band_mask]
-band_y = band_y[band_mask]
-band_sizes = np.random.uniform(band_min, band_max, len(band_x))
-ax.scatter(band_x, band_y, s=band_sizes, c='white', alpha=STARS_CONFIG['band_alpha'], marker='.')
-
 
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 7. PLOTTING PLANETS AND OBJECTS
+# 8. PLOTTING PLANETS AND OBJECTS
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Sun
@@ -408,7 +414,7 @@ for planet in planets:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 8. ASTEROIDS
+# 9. ASTEROIDS
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Asteroid belt between Mars and Jupiter
@@ -458,10 +464,11 @@ ax.scatter(asteroid_x, asteroid_y, s=asteroid_sizes, c=asteroid_colors, alpha=as
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 8.1 KUIPER BELT
+# 9.1 KUIPER BELT
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Ranges for Kuiper belt
+neptune_r = planet_radii['Neptune']
 kuiper_inner = neptune_r * 1.05
 kuiper_outer = neptune_r * 1.5
 
@@ -495,10 +502,11 @@ ax.scatter(kuiper_x, kuiper_y, s=kuiper_sizes, c=kuiper_colors,
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 8.2 JUPITER TROJANS
+# 9.2 JUPITER TROJANS
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Jupiter Trojans - get Jupiter's position
+jupiter_r = planet_radii['Jupiter']
 jupiter_L = longitudes['Jupiter'] % 360
 
 def trojan_cloud(jupiter_r, jupiter_L, offset_deg, n=700):
@@ -536,7 +544,7 @@ trojan_cloud(jupiter_r, jupiter_L, -60)   # L5
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 9. MOONS AND DWARF PLANETS
+# 10. MOONS AND DWARF PLANETS
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Jupiter's moons
@@ -640,8 +648,9 @@ for moon_name, data in earth_moon_data.items():
 
 # Neptune's moon Triton
 neptune_theta = longitude_to_theta(longitudes['Neptune'])
-neptune_x = cx + neptune_r * math.cos(neptune_theta)
-neptune_y = cy + neptune_r * math.sin(neptune_theta)
+neptune_r_plot = planet_radii['Neptune']
+neptune_x = cx + neptune_r_plot * math.cos(neptune_theta)
+neptune_y = cy + neptune_r_plot * math.sin(neptune_theta)
 
 epoch_jd_2025 = 2460676.5 # Reference epoch: January 1, 2025, 00:00 UTC (JD 2460676.5)
 days_since_epoch = utc.ut - epoch_jd_2025
@@ -801,7 +810,7 @@ ceres_theta = math.radians(-(0 - ceres_L))
 
 # Plot Ceres
 # Visual radius placed between Mars and Jupiter for clarity
-ceres_r = (mars_r + jupiter_r) / 2  
+ceres_r = (planet_radii['Mars'] + planet_radii['Jupiter']) / 2  
 ceres_x = cx + ceres_r * math.cos(ceres_theta)
 ceres_y = cy + ceres_r * math.sin(ceres_theta)
 
@@ -812,7 +821,7 @@ ax.add_artist(AnnotationBbox(ceres_imagebox, (ceres_x, ceres_y), frameon=False))
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 10. CANVAS FINALIZATION
+# 11. CANVAS FINALIZATION
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Limits and aspect
@@ -832,7 +841,7 @@ ax.axis('off')
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 11. BOTTOM RIGHT INFO
+# 12. BOTTOM RIGHT INFO
 # ═══════════════════════════════════════════════════════════════════════════
 
 if show_info_text:
@@ -881,7 +890,7 @@ if show_info_text:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 11.1 MOON PHASE
+# 12.1 MOON PHASE
 # ═══════════════════════════════════════════════════════════════════════════
 
     # Get moon phase info
@@ -922,7 +931,7 @@ if show_info_text:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 11.2 PLOT INFO TEXT
+# 12.2 PLOT INFO TEXT
 # ═══════════════════════════════════════════════════════════════════════════
 
     cal = utc.Calendar()
@@ -1005,7 +1014,7 @@ if show_info_text:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 12. FINALIZE AND SAVE IMAGE
+# 13. FINALIZE AND SAVE IMAGE
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Save and show
