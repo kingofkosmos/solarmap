@@ -1,0 +1,11 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Run and Show",
+            "type": "shell",
+            "command": "${workspaceFolder}/run_and_show_solarmap.bat",
+            "problemMatcher": []
+        }
+    ]
+}

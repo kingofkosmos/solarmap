@@ -20,7 +20,6 @@ import datetime
 # ═══════════════════════════════════════════════════════════════════════════
 
 #TODO: Mask stars within rings
-#TODO: Remove matplotlib plot
 #TODO: Automatic wallpaper generation in Github Actions?
 #TODO: Weather info
 ##      Rain/sleet/snow chance? Cloudiness? Sun UV strength?
@@ -1044,7 +1043,6 @@ cropped = img.crop((left, top, left + crop_w, top + crop_h))
 # Downsample to final size with high-quality resampling
 final_img = cropped.resize((width_px, height_px), Image.LANCZOS)
 final_img.save("solarmap.png")
+print("Solar map saved as solarmap.png")
 
 buffer.close()
-
-plt.show()
