@@ -185,7 +185,7 @@ def get_tomorrow_forecast(lat, lon):
 
 # Get weather forecast
 min_temp, max_temp, avg_temp = get_tomorrow_forecast(latitude, longitude)
-weather_line = f"\nHuomisen sää:\nmin: {min_temp:+.1f} °C maks: {max_temp:+.1f} °C\nka: {avg_temp:+.1f} °C\n".replace('.', ',') if min_temp is not None else ""
+weather_line = f"\nSää huomenna:\nmin: {min_temp:+.1f} °C maks: {max_temp:+.1f} °C\nka: {avg_temp:+.1f} °C\n".replace('.', ',') if min_temp is not None else ""
 
 # Get current time
 if custom_date is None or custom_date == "Now":
@@ -253,42 +253,7 @@ cy = cy + cy_offset
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 6. BACKGROUND STARS
-# ═══════════════════════════════════════════════════════════════════════════
-
-# Calculate aspect-aware limits for stars
-aspect = fig_width / fig_height
-if fig_aspect > 1:  # Wider than tall
-    star_xlim = (-1.3 * aspect, 1.3 * aspect)
-    star_ylim = (-1.3, 1.3)
-else:  # Taller than wide
-    star_xlim = (-1.3, 1.3)
-    star_ylim = (-1.3 / aspect, 1.3 / aspect)
-
-# Generate stars
-np.random.seed(RANDOM_SEED)
-
-# Base stars
-num_stars = STARS_CONFIG['base_count']
-star_x = np.random.uniform(star_xlim[0], star_xlim[1], num_stars)
-star_y = np.random.uniform(star_ylim[0], star_ylim[1], num_stars)
-base_min, base_max = STARS_CONFIG['base_size_range']
-star_sizes = np.random.uniform(base_min, base_max, num_stars)
-ax.scatter(star_x, star_y, s=star_sizes, c='white', alpha=STARS_CONFIG['base_alpha'], marker='.')
-
-# Dense band
-band_stars = STARS_CONFIG['band_count']
-band_x = np.random.uniform(star_xlim[0], star_xlim[1], band_stars)
-band_y = np.random.normal(0, STARS_CONFIG['band_width'], band_stars)
-band_min, band_max = STARS_CONFIG['band_size_range']
-band_sizes = np.random.uniform(band_min, band_max, band_stars)
-ax.scatter(band_x, band_y, s=band_sizes, c='white', alpha=STARS_CONFIG['band_alpha'], marker='.')
-
-
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# 7. PLANETARY RINGS AND RADII
+# 6. PLANETARY RINGS AND RADII
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Rings
@@ -312,6 +277,59 @@ for i, r in enumerate(rings[:-1]):  # All rings except the last one
 
 # Radii for each planet
 planet_radii = {p.name: rings[i] for i, p in enumerate(planets)}
+
+
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 7. BACKGROUND STARS
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Calculate aspect-aware limits for stars
+aspect = fig_width / fig_height
+if fig_aspect > 1:  # Wider than tall
+    star_xlim = (-1.3 * aspect, 1.3 * aspect)
+    star_ylim = (-1.3, 1.3)
+else:  # Taller than wide
+    star_xlim = (-1.3, 1.3)
+    star_ylim = (-1.3 / aspect, 1.3 / aspect)
+
+# Generate stars
+np.random.seed(RANDOM_SEED)
+
+# Base stars
+num_stars = STARS_CONFIG['base_count']
+star_x = np.random.uniform(star_xlim[0], star_xlim[1], num_stars)
+star_y = np.random.uniform(star_ylim[0], star_ylim[1], num_stars)
+base_min, base_max = STARS_CONFIG['base_size_range']
+star_sizes = np.random.uniform(base_min, base_max, num_stars)
+
+# Dense band
+band_stars = STARS_CONFIG['band_count']
+band_x = np.random.uniform(star_xlim[0], star_xlim[1], band_stars)
+band_y = np.random.normal(0, STARS_CONFIG['band_width'], band_stars)
+band_min, band_max = STARS_CONFIG['band_size_range']
+band_sizes = np.random.uniform(band_min, band_max, band_stars)
+
+# Mask out stars inside Neptune's ring
+neptune_radius = planet_radii['Neptune']
+star_distances = np.sqrt((star_x - cx)**2 + (star_y - cy)**2)
+band_distances = np.sqrt((band_x - cx)**2 + (band_y - cy)**2)
+
+star_mask = star_distances > neptune_radius * 1.05
+band_mask = band_distances > neptune_radius * 1.05
+
+star_x = star_x[star_mask]
+star_y = star_y[star_mask]
+star_sizes = star_sizes[star_mask]
+
+band_x = band_x[band_mask]
+band_y = band_y[band_mask]
+band_sizes = band_sizes[band_mask]
+
+# Plot stars
+ax.scatter(star_x, star_y, s=star_sizes, c='white', alpha=STARS_CONFIG['base_alpha'], marker='.')
+ax.scatter(band_x, band_y, s=band_sizes, c='white', alpha=STARS_CONFIG['band_alpha'], marker='.')
 
 
 
@@ -941,7 +959,7 @@ if show_info_text:
         f"{days_to_full:.0f} pv täysikuuhun\n"
         f"{weather_line}"
         f"\n"
-        f"Huomisen päivänvalo:\n"
+        f"Päivänvalo huomenna:\n"
         f"klo {sunrise_time} - {sunset_time}\n"
         f"{daylight_hours} t {daylight_mins} min\n"
         f"({date_str})"
