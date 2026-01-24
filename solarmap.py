@@ -19,7 +19,8 @@ import datetime
 # 1. TO-DO LIST
 # ═══════════════════════════════════════════════════════════════════════════
 
-#TODO: Mask stars within rings
+#TODO: Supersample multiplier to configuration
+#TODO: All magic numbers to configuration
 #TODO: Automatic wallpaper generation in Github Actions?
 #TODO: Weather info
 ##      Rain/sleet/snow chance? Cloudiness? Sun UV strength?
@@ -961,8 +962,7 @@ if show_info_text:
         f"\n"
         f"Päivänvalo huomenna:\n"
         f"klo {sunrise_time} - {sunset_time}\n"
-        f"{daylight_hours} t {daylight_mins} min\n"
-        f"({date_str})"
+        f"{daylight_hours} t {daylight_mins} min"
     )
 
     # Count lines to position moon indicator at first line
@@ -1027,6 +1027,18 @@ if show_info_text:
             ha='right', va='bottom',
             alpha=0.7)
 
+    # Plot date separately in bottom right corner
+    if fig_aspect > 1:
+        date_x = 1.3 * aspect - 0.07
+        date_y = -1.3 + 0.05
+    else:
+        date_x = 1.3 - 0.07
+        date_y = (-1.3 / aspect) + 0.05
+    
+    ax.text(date_x, date_y, f"{date_str}",
+            color='white', fontsize=12,
+            ha='right', va='bottom',
+            alpha=0.3)
 
 
 
@@ -1034,7 +1046,6 @@ if show_info_text:
 # 13. FINALIZE AND SAVE IMAGE
 # ═══════════════════════════════════════════════════════════════════════════
 
-# Save and show
 plt.tight_layout()
 
 # Supersample entire image for antialiasing with overscan
