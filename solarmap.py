@@ -19,6 +19,7 @@ import datetime
 # 1. TO-DO LIST
 # ═══════════════════════════════════════════════════════════════════════════
 
+#TODO: Car block heater warning
 #TODO: Supersample multiplier to configuration
 #TODO: All magic numbers to configuration
 #TODO: Automatic wallpaper generation in Github Actions?
@@ -137,7 +138,7 @@ def svg_to_imagebox(svg_path, zoom=0.1, color=None):
 # ═══════════════════════════════════════════════════════════════════════════
 
 def get_tomorrow_forecast(lat, lon):
-    """Get tomorrow's min/max/avg temperature from FMI."""
+    """Get tomorrow's min/max/avg temperature and 6 AM temperature from FMI."""
     import requests
     import xml.etree.ElementTree as ET
     from datetime import datetime, timedelta
@@ -163,29 +164,58 @@ def get_tomorrow_forecast(lat, lon):
         print(f"FMI connection status: {response.status_code}")
         
         if response.status_code != 200:
-            return None, None, None
+            return None, None, None, None
         
         root = ET.fromstring(response.content)
         
+        # Parse timestamps and temperatures
+        timestamps = []
         temps = []
+        
+        # Find time positions (format: lat lon timestamp)
+        for elem in root.iter():
+            if 'positions' in elem.tag and elem.text:
+                position_data = elem.text.strip().split()
+                # Timestamps are at indices 2, 5, 8, etc.
+                for i in range(2, len(position_data), 3):
+                    timestamps.append(int(position_data[i]))
+        
+        # Find temperature values
         for elem in root.iter():
             if 'doubleOrNilReasonTupleList' in elem.tag:
                 values = elem.text.strip().split()
                 temps.extend([float(v) for v in values if v not in ['NaN', '']])
 
+        print(f"Parsed {len(timestamps)} timestamps and {len(temps)} temperatures")
+
+        # Find 6 AM temperature
+        morning_temp = None
+        if timestamps and temps and len(timestamps) == len(temps):
+            target_hour = 6
+            min_diff = float('inf')
+            for timestamp, temp in zip(timestamps, temps):
+                dt = datetime.fromtimestamp(timestamp)
+                hour_diff = abs(dt.hour - target_hour)
+                if hour_diff < min_diff:
+                    min_diff = hour_diff
+                    morning_temp = temp
+            print(f"Morning (6 AM) temp: {morning_temp}°C")
+
         if temps:
             avg_temp = sum(temps) / len(temps)
-            return min(temps), max(temps), avg_temp
+            return min(temps), max(temps), avg_temp, morning_temp
         else:
             print("No temps found!")
 
     except Exception as e:
         print(f"Exception: {e}")
+        import traceback
+        traceback.print_exc()
     
-    return None, None, None
+    return None, None, None, None
 
 # Get weather forecast
-min_temp, max_temp, avg_temp = get_tomorrow_forecast(latitude, longitude)
+min_temp, max_temp, avg_temp, morning_temp = get_tomorrow_forecast(latitude, longitude)
 weather_line = f"\nSää huomenna:\nmin: {min_temp:+.1f} °C maks: {max_temp:+.1f} °C\nka: {avg_temp:+.1f} °C\n".replace('.', ',') if min_temp is not None else ""
 
 # Get current time
@@ -973,6 +1003,24 @@ if show_info_text:
     moon_indicator_x = text_x - 0.04
     moon_indicator_y = text_y + (num_lines - 1) * line_height  # Top line position
     moon_radius = 0.035
+    
+# Car block heater warning if morning temp < 5°C
+    if morning_temp is not None and morning_temp < 5:
+        # Determine heating time based on temperature
+        if morning_temp >= -5:
+            heating_time = "0,5 h"
+        elif morning_temp >= -10:
+            heating_time = "1 h"
+        else:
+            heating_time = "2 h"
+        
+        warning_text = f"Lämpötila aamulla klo 6: {morning_temp:+.1f} °C\nLohkolämmitin päälle {heating_time} ajaksi".replace('.', ',')
+        warning_y = moon_indicator_y + 0.10
+        warning_x = moon_indicator_x + 0.04
+        ax.text(warning_x, warning_y, warning_text,
+                color='red', fontsize=12,
+                ha='right', va='bottom',
+                alpha=0.5)
 
     # Draw dark gray base circle
     ax.add_patch(plt.Circle((moon_indicator_x, moon_indicator_y), moon_radius, fill=True, color='#404040', alpha=0.9, zorder=10))
@@ -1038,7 +1086,7 @@ if show_info_text:
     ax.text(date_x, date_y, f"{date_str}",
             color='white', fontsize=12,
             ha='right', va='bottom',
-            alpha=0.3)
+            alpha=0.2)
 
 
 
