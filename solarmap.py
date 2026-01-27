@@ -19,13 +19,16 @@ import datetime
 # 1. TO-DO LIST
 # ═══════════════════════════════════════════════════════════════════════════
 
-#TODO: Car block heater warning
-#TODO: Supersample multiplier to configuration
-#TODO: All magic numbers to configuration
+#TODO: Test different resolutions and aspect ratios
+#TODO: Reminder to shut off outside water before the first freeze after summer
+#TODO: Move supersample multiplier to configuration
+#TODO: Move magic numbers to configuration
 #TODO: Automatic wallpaper generation in Github Actions?
 #TODO: Weather info
-##      Rain/sleet/snow chance? Cloudiness? Sun UV strength?
-##      Northern lights forecast?
+##      Weather alerts
+##      Rain/sleet/snow chance
+##      Cloudiness
+##      UV strength
 #TODO: Comets (Halley, Hale-Bopp)
 #TODO: Arguments for command line usage
 #TODO: Realistic elliptical orbits (enables rest of the dwarf planets & astrology)
@@ -186,8 +189,6 @@ def get_tomorrow_forecast(lat, lon):
                 values = elem.text.strip().split()
                 temps.extend([float(v) for v in values if v not in ['NaN', '']])
 
-        print(f"Parsed {len(timestamps)} timestamps and {len(temps)} temperatures")
-
         # Find 6 AM temperature
         morning_temp = None
         if timestamps and temps and len(timestamps) == len(temps):
@@ -199,7 +200,6 @@ def get_tomorrow_forecast(lat, lon):
                 if hour_diff < min_diff:
                     min_diff = hour_diff
                     morning_temp = temp
-            print(f"Morning (6 AM) temp: {morning_temp}°C")
 
         if temps:
             avg_temp = sum(temps) / len(temps)
@@ -216,7 +216,72 @@ def get_tomorrow_forecast(lat, lon):
 
 # Get weather forecast
 min_temp, max_temp, avg_temp, morning_temp = get_tomorrow_forecast(latitude, longitude)
-weather_line = f"\nSää huomenna:\nmin: {min_temp:+.1f} °C maks: {max_temp:+.1f} °C\nka: {avg_temp:+.1f} °C\n".replace('.', ',') if min_temp is not None else ""
+weather_line = f"Sää huomenna:\nmin: {min_temp:+.1f} °C maks: {max_temp:+.1f} °C\nka: {avg_temp:+.1f} °C\n".replace('.', ',') if min_temp is not None else ""
+
+def get_aurora_forecast():
+    """Get aurora forecast from FMI RWC Finland."""
+    import requests
+    
+    url = "https://space.fmi.fi/MIRACLE/RWC/data/RX_latest_en.json"
+    
+    try:
+        response = requests.get(url, timeout=10)
+        print(f"Aurora forecast status: {response.status_code}")
+        
+        if response.status_code != 200:
+            return None, None
+        
+        data = response.json()
+        
+        # Try NUR first, fallback to HAN if current value is null
+        nur_data = data['data']['NUR']
+        han_data = data['data']['HAN']
+        
+        # Use NUR for forecast, but HAN for current if NUR is null
+        current_val = nur_data['RX']['value']
+        current_level = nur_data['RX']['activity level']
+        
+        if current_val is None:
+            current_val = han_data['RX']['value']
+            current_level = han_data['RX']['activity level']
+            print(f"NUR current is null, using HAN instead")
+        
+        # Predicted max for next hour (from NUR)
+        next_val = nur_data['RXmax']['value']
+        next_level = nur_data['RXmax']['activity level']
+        
+        # Translate to Finnish
+        translate = {
+            'low': 'matala',
+            'increased': 'kohonnut',
+            'moderate': 'kohtalainen',
+            'high': 'KORKEA!',
+            'very high': 'ERITTÄIN KORKEA!',
+            'Null': 'ei tietoa'
+        }
+        
+        current_fi = translate.get(current_level, current_level)
+        next_fi = translate.get(next_level, next_level)
+        
+        return (current_val, current_fi), (next_val, next_fi)
+        
+    except Exception as e:
+        print(f"Aurora forecast error: {e}")
+        return None, None
+
+# Get aurora forecast
+aurora_current, aurora_next = get_aurora_forecast()
+
+if aurora_current and aurora_next:
+    curr_val, curr_level = aurora_current
+    next_val, next_level = aurora_next
+    
+    curr_str = f"{curr_val} ({curr_level})" if curr_val is not None else f"({curr_level})"
+    next_str = f"{next_val} ({next_level})"
+    
+    aurora_line = f"Revontulien tod.näk.\nnyt: {curr_str}\n+1 h: {next_str}\n"
+else:
+    aurora_line = ""
 
 # Get current time
 if custom_date is None or custom_date == "Now":
@@ -931,12 +996,6 @@ if show_info_text:
 
 
 
-
-
-
-
-
-
 # ═══════════════════════════════════════════════════════════════════════════
 # 12.1 MOON PHASE
 # ═══════════════════════════════════════════════════════════════════════════
@@ -988,6 +1047,9 @@ if show_info_text:
     info_text = (
         f"{phase_name}\n"
         f"{days_to_full:.0f} pv täysikuuhun\n"
+        f"\n"
+        f"{aurora_line}"
+        f"\n"
         f"{weather_line}"
         f"\n"
         f"Päivänvalo huomenna:\n"
@@ -1087,6 +1149,7 @@ if show_info_text:
             color='white', fontsize=12,
             ha='right', va='bottom',
             alpha=0.2)
+
 
 
 
