@@ -369,7 +369,7 @@ current += step * 2 # Extra gap before Pluto
 rings.append(current) # Ring 9 (Pluto)
 for i, r in enumerate(rings[:-1]):  # All rings except the last one
     ax.add_patch(
-        plt.Circle((cx, cy), r, fill=False, linewidth=0.4, color='white', linestyle=(0, (10, 10))))
+        plt.Circle((cx, cy), r, fill=False, linewidth=0.4, color='white', alpha=0.4, linestyle=(0, (13, 16))))
 
 # Radii for each planet
 planet_radii = {p.name: rings[i] for i, p in enumerate(planets)}
