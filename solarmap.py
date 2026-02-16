@@ -1044,111 +1044,147 @@ if show_info_text:
     cal = utc.Calendar()
     date_str = f"{int(cal[0])}-{int(cal[1]):02d}-{int(cal[2]):02d}"
 
-    info_text = (
-        f"{phase_name}\n"
-        f"{days_to_full:.0f} pv täysikuuhun\n"
-        f"\n"
-        f"{aurora_line}"
-        f"\n"
-        f"{weather_line}"
-        f"\n"
-        f"Päivänvalo huomenna:\n"
-        f"klo {sunrise_time} - {sunset_time}\n"
-        f"{daylight_hours} t {daylight_mins} min"
-    )
+info_boxes = []
 
-    # Count lines to position moon indicator at first line
-    num_lines = info_text.count('\n')+2
-    line_height = 0.04  # Adjust if needed for your text size
-
-    # Position for moon phase circle (aligned with first line)
-    moon_indicator_x = text_x - 0.04
-    moon_indicator_y = text_y + (num_lines - 1) * line_height  # Top line position
-    moon_radius = 0.035
-    
-# Car block heater warning if morning temp < 5°C
-    if morning_temp is not None and morning_temp < 5:
-        # Determine heating time based on temperature
-        if morning_temp >= -5:
-            heating_time = "0,5 h"
-        elif morning_temp >= -10:
-            heating_time = "1 h"
-        else:
-            heating_time = "2 h"
-        
-        warning_text = f"Lämpötila aamulla klo 6: {morning_temp:+.1f} °C\nLohkolämmitin päälle {heating_time} ajaksi".replace('.', ',')
-        warning_y = moon_indicator_y + 0.10
-        warning_x = moon_indicator_x + 0.04
-        ax.text(warning_x, warning_y, warning_text,
-                color='red', fontsize=12,
-                ha='right', va='bottom',
-                alpha=0.5)
-
-    # Draw dark gray base circle
-    ax.add_patch(plt.Circle((moon_indicator_x, moon_indicator_y), moon_radius, fill=True, color='#404040', alpha=0.9, zorder=10))
-
-    # Draw illuminated part
-    if illumination > 0.01:
-        theta = np.linspace(np.pi/2, -np.pi/2, 100)
-        
-        if is_waxing:
-            # Right side lit
-            x_outer = moon_indicator_x + moon_radius * np.cos(theta)
-            y_outer = moon_indicator_y + moon_radius * np.sin(theta)
-            
-            terminator_x_pos = moon_radius - (2 * illumination * moon_radius)
-            curve_amount = abs(illumination - 0.5) * 2
-            ellipse_width = curve_amount * moon_radius
-            
-            if illumination < 0.5:
-                x_terminator = moon_indicator_x + ellipse_width * np.cos(theta)
-            else:
-                x_terminator = moon_indicator_x - ellipse_width * np.cos(theta)
-            y_terminator = moon_indicator_y + moon_radius * np.sin(theta)
-            
-            x_lit = np.concatenate([x_outer, x_terminator[::-1]])
-            y_lit = np.concatenate([y_outer, y_terminator[::-1]])
-            
-            ax.fill(x_lit, y_lit, color='white', alpha=0.9, zorder=11, linewidth=0)
-
-        else:
-            # Left side lit
-            x_outer = moon_indicator_x - moon_radius * np.cos(theta)
-            y_outer = moon_indicator_y + moon_radius * np.sin(theta)
-            
-            terminator_x_pos = -moon_radius + (2 * illumination * moon_radius)
-            curve_amount = abs(illumination - 0.5) * 2
-            ellipse_width = curve_amount * moon_radius
-            
-            if illumination > 0.5:
-                x_terminator = moon_indicator_x + ellipse_width * np.cos(theta)
-            else:
-                x_terminator = moon_indicator_x - ellipse_width * np.cos(theta)
-            y_terminator = moon_indicator_y + moon_radius * np.sin(theta)
-            
-            x_lit = np.concatenate([x_outer, x_terminator[::-1]])
-            y_lit = np.concatenate([y_outer, y_terminator[::-1]])
-            
-            ax.fill(x_lit, y_lit, color='white', alpha=0.9, zorder=11, linewidth=0)
-
-    # Plot info text
-    ax.text(text_x, text_y, info_text,
-            color='white', fontsize=12,
-            ha='right', va='bottom',
-            alpha=0.7)
-
-    # Plot date separately in bottom right corner
-    if fig_aspect > 1:
-        date_x = 1.3 * aspect - 0.07
-        date_y = -1.3 + 0.05
+# 1. Block heater alert (if needed)
+if morning_temp is not None and morning_temp < 5:
+    if morning_temp >= -5:
+        heating_time = "0,5 h"
+    elif morning_temp >= -10:
+        heating_time = "1 h"
     else:
-        date_x = 1.3 - 0.07
-        date_y = (-1.3 / aspect) + 0.05
+        heating_time = "2 h"
+
+    warning_text = (
+        f"Lämpötila aamulla klo 6: {morning_temp:+.1f} °C\n"
+        f"Lohkolämmitin päälle {heating_time} ajaksi"
+    ).replace('.', ',')
+
+    info_boxes.append(warning_text)
+
+# 2. Moon phase
+moon_text = f"\n\n{phase_name}\n{days_to_full:.0f} pv täysikuuhun"
+info_boxes.append(moon_text)
+
+# 3. Aurora
+if aurora_line:
+    info_boxes.append(aurora_line.strip())
+
+# 4. Weather
+if weather_line:
+    info_boxes.append(weather_line.strip())
+
+# 5. Daylight
+daylight_text = (
+    f"Päivänvalo huomenna:\n"
+    f"klo {sunrise_time} - {sunset_time}\n"
+    f"{daylight_hours} t {daylight_mins} min"
+)
+info_boxes.append(daylight_text)
+
+
+# Draw stacked info boxes
+box_width = 0.5
+box_spacing = 0.0
+box_padding = 0.015
+current_y = text_y
     
-    ax.text(date_x, date_y, f"{date_str}",
-            color='white', fontsize=12,
-            ha='right', va='bottom',
-            alpha=0.2)
+for i, box_text in enumerate(reversed(info_boxes)):
+    # Count lines in this box
+    num_lines = box_text.count('\n') + 1
+    line_height = 0.035
+    box_height = num_lines * line_height + 2 * box_padding - 0.01
+    
+    # Draw white outline rectangle
+    box_left = text_x - box_width
+    box_bottom = current_y
+    
+    rect = plt.Rectangle((box_left, box_bottom), box_width, box_height,
+                        linewidth=0.3, edgecolor='white', facecolor='none',
+                        alpha=1, zorder=10)
+    ax.add_patch(rect)
+    
+    # Draw text inside box (left-aligned)
+    text_x_pos = box_left + box_padding
+    text_y_pos = box_bottom + box_padding
+    
+    is_block_box = (i == len(info_boxes) - 1)
+    text_color = 'red' if is_block_box else 'white'
+
+
+    ax.text(text_x_pos, text_y_pos, box_text,
+            color=text_color, fontsize=11,
+            ha='left', va='bottom',
+            alpha=0.7, zorder=11)
+    
+    # Special handling for first box (moon phase) - add moon indicator
+    if i == len(info_boxes) - 2:
+        moon_radius = 0.03
+
+        # top-left inside the box
+        moon_indicator_x = box_left + moon_radius + box_padding
+        moon_indicator_y = box_bottom + box_height - moon_radius - box_padding
+
+        # Draw dark gray base circle
+        ax.add_patch(plt.Circle((moon_indicator_x, moon_indicator_y), moon_radius, 
+                                fill=True, color='#404040', alpha=0.9, zorder=12))
+        
+        # Draw illuminated part
+        if illumination > 0.01:
+            theta = np.linspace(np.pi/2, -np.pi/2, 100)
+            
+            if is_waxing:
+                # Right side lit
+                x_outer = moon_indicator_x + moon_radius * np.cos(theta)
+                y_outer = moon_indicator_y + moon_radius * np.sin(theta)
+                
+                curve_amount = abs(illumination - 0.5) * 2
+                ellipse_width = curve_amount * moon_radius
+                
+                if illumination < 0.5:
+                    x_terminator = moon_indicator_x + ellipse_width * np.cos(theta)
+                else:
+                    x_terminator = moon_indicator_x - ellipse_width * np.cos(theta)
+                y_terminator = moon_indicator_y + moon_radius * np.sin(theta)
+                
+                x_lit = np.concatenate([x_outer, x_terminator[::-1]])
+                y_lit = np.concatenate([y_outer, y_terminator[::-1]])
+                
+                ax.fill(x_lit, y_lit, color='white', alpha=0.9, zorder=13, linewidth=0)
+            else:
+                # Left side lit
+                x_outer = moon_indicator_x - moon_radius * np.cos(theta)
+                y_outer = moon_indicator_y + moon_radius * np.sin(theta)
+                
+                curve_amount = abs(illumination - 0.5) * 2
+                ellipse_width = curve_amount * moon_radius
+                
+                if illumination > 0.5:
+                    x_terminator = moon_indicator_x + ellipse_width * np.cos(theta)
+                else:
+                    x_terminator = moon_indicator_x - ellipse_width * np.cos(theta)
+                y_terminator = moon_indicator_y + moon_radius * np.sin(theta)
+                
+                x_lit = np.concatenate([x_outer, x_terminator[::-1]])
+                y_lit = np.concatenate([y_outer, y_terminator[::-1]])
+                
+                ax.fill(x_lit, y_lit, color='white', alpha=0.9, zorder=13, linewidth=0)
+
+    # Move up for next box
+    current_y += box_height + box_spacing
+
+# Plot date separately in bottom right corner
+if fig_aspect > 1:
+    date_x = 1.3 * aspect - 0.07
+    date_y = -1.3 + 0.05
+else:
+    date_x = 1.3 - 0.07
+    date_y = (-1.3 / aspect) + 0.05
+
+ax.text(date_x, date_y, f"{date_str}",
+        color='white', fontsize=12,
+        ha='right', va='bottom',
+        alpha=0.2)
 
 
 
