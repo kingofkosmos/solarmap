@@ -57,17 +57,18 @@ trail_days = 150  # How long the trails are in days
 
 # Planet colors
 planet_colors = {
-    'Sun':          '#FFF75E',
-    'Mercury':      '#815313',
-    'Venus':        '#3CB371',
-    'Earth_ocean':  '#4A90E2',
-    'Earth_land':   "#013C28",
-    'Mars':         '#CD5C5C',
-    'Jupiter':      '#C88B3A',
-    'Saturn':       '#FAD5A5',
-    'Uranus':       '#4FD0E0',
-    'Neptune':      '#4166F5',
-    'Pluto':        '#A0826D'
+    'Sun':               '#FFF75E',
+    'Mercury':           '#815313',
+    'Venus':             '#3CB371',
+    'Earth_ocean':       '#4A90E2',
+    'Earth_land_top':    '#013C28',
+    'Earth_land_bottom': '#F5F5DC',
+    'Mars':              '#CD5C5C',
+    'Jupiter':           '#C88B3A',
+    'Saturn':            '#FAD5A5',
+    'Uranus':            '#4FD0E0',
+    'Neptune':           '#4166F5',
+    'Pluto':             '#A0826D'
 }
 
 
@@ -462,17 +463,22 @@ for name, L in longitudes.items():
         png_bytes = cairosvg.svg2png(url=svg_path)
         image = mpimg.imread(io.BytesIO(png_bytes), format='png')
         
-        # Black areas (landmasses) → green, White pixels (ocean) → blue
+        # Black areas (landmasses) → gradient green-to-beige, White pixels (ocean) → blue
         ocean_rgb = hex2color(planet_colors['Earth_ocean'])
-        land_rgb = hex2color(planet_colors['Earth_land'])
-        
-        # Mask for black vs white pixels
-        is_black = image[:, :, :3].max(axis=2) < 0.5  # Black = landmasses
-        
-        # Apply colors
+        land_rgb_top = hex2color(planet_colors['Earth_land_top'])
+        land_rgb_bottom = hex2color(planet_colors['Earth_land_bottom'])
+
+        # Build per-row gradient for land (top = green, bottom = beige)
+        h = image.shape[0]
+        t = np.linspace(0, 0.8, h)[:, np.newaxis]  # shape (h, 1)
+        land_gradient = (1 - t) * np.array(land_rgb_top) + t * np.array(land_rgb_bottom)  # (h, 3)
+
+        is_black = image[:, :, :3].max(axis=2) < 0.5
+
         for i in range(3):
-            image[:, :, i] = np.where(is_black, land_rgb[i], ocean_rgb[i])
-        
+            land_color_channel = np.broadcast_to(land_gradient[:, i:i+1], image.shape[:2])
+            image[:, :, i] = np.where(is_black, land_color_channel, ocean_rgb[i])
+
         imagebox = OffsetImage(image, zoom=zoom)
         ab = AnnotationBbox(imagebox, (x, y), frameon=False)
         ax.add_artist(ab)
