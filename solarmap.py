@@ -527,7 +527,9 @@ for planet in planets:
     trail_color = planet_colors['Earth_ocean'] if name == 'Earth' else planet_colors.get(name, 'white')
 
     # Plot trail
-    plot_fading_arc(ax, cx, cy, r, theta_start, theta_end, trail_color, linewidth=1.5, n=100)
+    arc_span_rad = abs(theta_start - theta_end)
+    n_segments = max(100, int(arc_span_rad / (2 * math.pi) * 1000))
+    plot_fading_arc(ax, cx, cy, r, theta_start, theta_end, trail_color, linewidth=1.5, n=n_segments)
 
 
 
