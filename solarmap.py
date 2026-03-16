@@ -19,6 +19,9 @@ import datetime
 # 1. TO-DO LIST
 # ═══════════════════════════════════════════════════════════════════════════
 
+#TODO: Fix text positions when offline
+#TODO: Eng/fi language option
+#TODO: Full online mode: fetch all positions from Horizons for max accuracy
 #TODO: Test different resolutions and aspect ratios
 #TODO: Reminder to shut off outside water before the first freeze after summer
 #TODO: Move supersample multiplier to configuration
@@ -218,71 +221,6 @@ def get_tomorrow_forecast(lat, lon):
 # Get weather forecast
 min_temp, max_temp, avg_temp, morning_temp = get_tomorrow_forecast(latitude, longitude)
 weather_line = f"Sää huomenna:\nmin: {min_temp:+.1f} °C maks: {max_temp:+.1f} °C\nka: {avg_temp:+.1f} °C\n".replace('.', ',') if min_temp is not None else ""
-
-def get_aurora_forecast():
-    """Get aurora forecast from FMI RWC Finland."""
-    import requests
-    
-    url = "https://space.fmi.fi/MIRACLE/RWC/data/RX_latest_en.json"
-    
-    try:
-        response = requests.get(url, timeout=10)
-        print(f"Aurora forecast status: {response.status_code}")
-        
-        if response.status_code != 200:
-            return None, None
-        
-        data = response.json()
-        
-        # Try NUR first, fallback to HAN if current value is null
-        nur_data = data['data']['NUR']
-        han_data = data['data']['HAN']
-        
-        # Use NUR for forecast, but HAN for current if NUR is null
-        current_val = nur_data['RX']['value']
-        current_level = nur_data['RX']['activity level']
-        
-        if current_val is None:
-            current_val = han_data['RX']['value']
-            current_level = han_data['RX']['activity level']
-            print(f"NUR current is null, using HAN instead")
-        
-        # Predicted max for next hour (from NUR)
-        next_val = nur_data['RXmax']['value']
-        next_level = nur_data['RXmax']['activity level']
-        
-        # Translate to Finnish
-        translate = {
-            'low': 'matala',
-            'increased': 'kohonnut',
-            'moderate': 'kohtalainen',
-            'high': 'KORKEA!',
-            'very high': 'ERITTÄIN KORKEA!',
-            'Null': 'ei tietoa'
-        }
-        
-        current_fi = translate.get(current_level, current_level)
-        next_fi = translate.get(next_level, next_level)
-        
-        return (current_val, current_fi), (next_val, next_fi)
-        
-    except Exception as e:
-        print(f"Aurora forecast error: {e}")
-        return None, None
-
-# Get aurora forecast
-aurora_current, aurora_next = get_aurora_forecast()
-
-if aurora_current and aurora_next:
-    curr_val, curr_level = aurora_current
-    next_val, next_level = aurora_next
-    
-    curr_str = f"{curr_val} ({curr_level})" if curr_val is not None else f"({curr_level})"
-    next_str = f"{next_val} ({next_level})"
-    
-    aurora_line = f"Revontulien tod.näk.\nnyt: {curr_str}\n+1 h: {next_str}\n"
-else:
-    aurora_line = ""
 
 # Get current time
 if custom_date is None or custom_date == "Now":
@@ -1071,18 +1009,14 @@ if morning_temp is not None and morning_temp < 5:
     info_boxes.append(warning_text)
 
 # 2. Moon phase
-moon_text = f"\n\n{phase_name}\n{days_to_full:.0f} pv täysikuuhun"
+moon_text = f"\n\n\n{phase_name}\n{days_to_full:.0f} pv täysikuuhun"
 info_boxes.append(moon_text)
 
-# 3. Aurora
-if aurora_line:
-    info_boxes.append(aurora_line.strip())
-
-# 4. Weather
+# 3. Weather
 if weather_line:
     info_boxes.append(weather_line.strip())
 
-# 5. Daylight
+# 4. Daylight
 daylight_text = (
     f"Päivänvalo huomenna:\n"
     f"klo {sunrise_time} - {sunset_time}\n"
@@ -1131,7 +1065,7 @@ for i, box_text in enumerate(reversed(info_boxes)):
 
         # top-left inside the box
         moon_indicator_x = box_left + moon_radius + box_padding
-        moon_indicator_y = box_bottom + box_height - moon_radius - box_padding
+        moon_indicator_y = box_bottom + box_height - moon_radius - box_padding - 0.02
 
         # Draw dark gray base circle
         ax.add_patch(plt.Circle((moon_indicator_x, moon_indicator_y), moon_radius, 
