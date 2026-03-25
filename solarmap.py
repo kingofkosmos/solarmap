@@ -552,69 +552,65 @@ trojan_cloud(jupiter_r, jupiter_L, -60)   # L5
 jupiter_theta = longitude_to_theta(longitudes['Jupiter'])
 jupiter_x = cx + jupiter_r * math.cos(jupiter_theta)
 jupiter_y = cy + jupiter_r * math.sin(jupiter_theta)
-
-moon_radii = {
-    'Io': 0.10,
-    'Europa': 0.11,
-    'Ganymede': 0.13,
-    'Callisto': 0.14
-}
-
 jm = JupiterMoons(utc)
-moon_data = {
-    'Io': jm.io,
-    'Europa': jm.europa,
-    'Ganymede': jm.ganymede,
-    'Callisto': jm.callisto
+
+jupiter_moon_data = {
+    'Io': {
+        'vec': jm.io,
+        'orbit_r': 0.10,
+        'color': '#F4D03F',
+        'zoom': 0.11,
+        'trail_fraction': 1/4
+    },
+    'Europa': {
+        'vec': jm.europa,
+        'orbit_r': 0.11,
+        'color': '#D4C5B0',
+        'zoom': 0.10,
+        'trail_fraction': 1/5
+    },
+    'Ganymede': {
+        'vec': jm.ganymede,
+        'orbit_r': 0.13,
+        'color': '#8B7E66',
+        'zoom': 0.15,
+        'trail_fraction': 1/8
+    },
+    'Callisto': {
+        'vec': jm.callisto,
+        'orbit_r': 0.14,
+        'color': '#4A4A4A',
+        'zoom': 0.13,
+        'trail_fraction': 1/10
+    }
 }
 
-# Jupiter moon colors
-jupiter_moon_colors = {
-    'Io': '#F4D03F',
-    'Europa': '#D4C5B0',
-    'Ganymede': '#8B7E66',
-    'Callisto': '#4A4A4A'
-}
+for moon_name, data in jupiter_moon_data.items():
+    moon_vec = data['vec']
 
-# Jupiter moon zooms
-jupiter_moon_zooms = {
-    'Io': 0.11,
-    'Europa': 0.10,
-    'Ganymede': 0.15,
-    'Callisto': 0.13
-}
-
-# Jupiter moon trail fractions
-jupiter_moon_trails = {
-    'Io': 1/4,
-    'Europa': 1/5,
-    'Ganymede': 1/8,
-    'Callisto': 1/10
-}
-
-for moon_name, moon_vec in moon_data.items():
     angle = math.degrees(math.atan2(moon_vec.y, moon_vec.x))
     theta = math.radians(-(0 - angle))
-    r = moon_radii[moon_name]
+
+    r = data['orbit_r']
     x = jupiter_x + r * math.cos(theta)
     y = jupiter_y + r * math.sin(theta)
 
-    moon_color = jupiter_moon_colors[moon_name]
-    moon_zoom = jupiter_moon_zooms[moon_name]
-    
-    # Plot Jupiter's moon
-    imagebox = svg_to_imagebox("icons/moon.svg", zoom=moon_zoom, color=moon_color)
-    ab = AnnotationBbox(imagebox, (x, y), frameon=False)
-    ax.add_artist(ab)
-    
-    # Plot trail
+    # Plot moon
+    imagebox = svg_to_imagebox("icons/moon.svg",
+                               zoom=data['zoom'],
+                               color=data['color'])
+    ax.add_artist(AnnotationBbox(imagebox, (x, y), frameon=False))
+
+    # Trail
     current_theta_deg = 0 - angle
-    arc_span = 360 * jupiter_moon_trails[moon_name]
-    
+    arc_span = 360 * data['trail_fraction']
+
     theta_start = math.radians(-current_theta_deg)
     theta_end = math.radians(-(current_theta_deg + arc_span))
-    
-    plot_fading_arc(ax, jupiter_x, jupiter_y, r, theta_start, theta_end, moon_color, linewidth=0.8)
+
+    plot_fading_arc(ax, jupiter_x, jupiter_y, r,
+                    theta_start, theta_end,
+                    data['color'], linewidth=0.8)
 
 # Earth's Moon
 earth_moon_data = {
@@ -697,13 +693,12 @@ for moon_name, data in neptune_moon_data.items():
     
     plot_fading_arc(ax, neptune_x, neptune_y, data['orbit_r'], theta_start, theta_end, moon_color, linewidth=0.7)
 
-# Saturn's moons
+# Saturn's moon Titan
 saturn_theta = longitude_to_theta(longitudes['Saturn'])
 saturn_r = planet_radii['Saturn']
 saturn_x = cx + saturn_r * math.cos(saturn_theta)
 saturn_y = cy + saturn_r * math.sin(saturn_theta)
 
-# Saturn moon data
 saturn_moon_data = {
     'Titan': {
         'epoch_angle': 356.104439,
@@ -712,22 +707,6 @@ saturn_moon_data = {
         'color': '#FFA500',
         'zoom': 0.14,
         'trail_fraction': 1/8
-    },
-    'Rhea': {
-        'epoch_angle': 2.830452,
-        'period': 4.518,
-        'orbit_r': 0.10,
-        'color': '#C0C0C0',
-        'zoom': 0.06,
-        'trail_fraction': 1/4
-    },
-    'Iapetus': {
-        'epoch_angle': 5.711541,
-        'period': 79.33,
-        'orbit_r': 0.12,
-        'color': '#8B7355',
-        'zoom': 0.06,
-        'trail_fraction': 1/12
     }
 }
 
@@ -752,71 +731,6 @@ for moon_name, data in saturn_moon_data.items():
     theta_end = math.radians(-(current_theta_deg + arc_span))
     
     plot_fading_arc(ax, saturn_x, saturn_y, data['orbit_r'], theta_start, theta_end, moon_color, linewidth=0.8)
-
-# Uranus's moons
-uranus_theta = longitude_to_theta(longitudes['Uranus'])
-uranus_r = planet_radii['Uranus']
-uranus_x = cx + uranus_r * math.cos(uranus_theta)
-uranus_y = cy + uranus_r * math.sin(uranus_theta)
-
-# Uranus's moons data
-uranus_moon_data = {
-    'Titania': {
-        'epoch_angle': 0.855326,
-        'period': 8.706,
-        'orbit_r': 0.07,
-        'color': '#B0A090',
-        'zoom': 0.06,
-        'trail_fraction': 1/6
-    },
-    'Oberon': {
-        'epoch_angle': 0.910603,
-        'period': 13.463,
-        'orbit_r': 0.08,
-        'color': '#8B8680',
-        'zoom': 0.06,
-        'trail_fraction': 1/8
-    }
-}
-
-for moon_name, data in uranus_moon_data.items():
-    # Calculate position
-    angle = (data['epoch_angle'] + days_since_epoch / data['period'] * 360) % 360
-    theta = math.radians(-(0 - angle))
-    
-    x = uranus_x + data['orbit_r'] * math.cos(theta)
-    y = uranus_y + data['orbit_r'] * math.sin(theta)
-    
-    # Plot moon
-    moon_color = data['color']
-    imagebox = svg_to_imagebox("icons/moon.svg", zoom=data['zoom'], color=moon_color)
-    ax.add_artist(AnnotationBbox(imagebox, (x, y), frameon=False))
-    
-    # Plot trail
-    current_theta_deg = 0 - angle
-    arc_span = 360 * data['trail_fraction']
-    
-    theta_start = math.radians(-current_theta_deg)
-    theta_end = math.radians(-(current_theta_deg + arc_span))
-    
-    plot_fading_arc(ax, uranus_x, uranus_y, data['orbit_r'], theta_start, theta_end, moon_color, linewidth=0.7)
-
-# Dwarf Planet Ceres
-ceres_L_epoch = 315.17       # Orbital Longitude on this date
-ceres_mean_motion = 0.21387  # Degrees per day
-
-# Calculate current position
-ceres_L = (ceres_L_epoch + ceres_mean_motion * days_since_epoch) % 360
-ceres_theta = math.radians(-(0 - ceres_L))
-
-# Plot Ceres
-# Visual radius placed between Mars and Jupiter for clarity
-ceres_r = (planet_radii['Mars'] + planet_radii['Jupiter']) / 2  
-ceres_x = cx + ceres_r * math.cos(ceres_theta)
-ceres_y = cy + ceres_r * math.sin(ceres_theta)
-
-ceres_imagebox = svg_to_imagebox("icons/moon.svg", zoom=0.05, color='#A0826D')
-ax.add_artist(AnnotationBbox(ceres_imagebox, (ceres_x, ceres_y), frameon=False))
 
 
 
