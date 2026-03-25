@@ -56,7 +56,7 @@ longitude = 23.66283
 custom_date = "Now"  # Options: None, "Now", "YYYY-MM-DD", or "YYYY-MM-DD HH:MM"
 
 # Orbital trails toggle
-trail_days = 150  # How long the trails are in days
+trail_days = 100  # How long the trails are in days
 
 # Planet colors
 planet_colors = {
@@ -74,6 +74,42 @@ planet_colors = {
     'Pluto':             '#A0826D'
 }
 
+
+# Language: 'fi' or 'en'
+LANGUAGE = 'en'
+
+STRINGS = {
+    'fi': {
+        'full_moon':        'Täysikuu',
+        'new_moon':         'Uusikuu',
+        'waxing_gibbous':   'Kasvava kupera kuu',
+        'first_quarter':    'Puolikuu (ensimmäinen neljännes)',
+        'waxing_crescent':  'Kasvava sirppi',
+        'waning_gibbous':   'Vähenevä kupera kuu',
+        'last_quarter':     'Puolikuu (viimeinen neljännes)',
+        'waning_crescent':  'Vähenevä sirppi',
+        'days_to_full':     'pv täysikuuhun',
+        'daylight_header':  'Päivänvalo huomenna:',
+        'daylight_time':    'klo {rise} - {set}',
+        'daylight_hours':   '{h} t {m} min',
+    },
+    'en': {
+        'full_moon':        'Full Moon',
+        'new_moon':         'New Moon',
+        'waxing_gibbous':   'Waxing Gibbous',
+        'first_quarter':    'First Quarter',
+        'waxing_crescent':  'Waxing Crescent',
+        'waning_gibbous':   'Waning Gibbous',
+        'last_quarter':     'Last Quarter',
+        'waning_crescent':  'Waning Crescent',
+        'days_to_full':     'days to full moon',
+        'daylight_header':  'Daylight tomorrow:',
+        'daylight_time':    '{rise} - {set}',
+        'daylight_hours':   '{h} h {m} min',
+    }
+}
+
+T = STRINGS[LANGUAGE]
 
 
 
@@ -136,91 +172,6 @@ def svg_to_imagebox(svg_path, zoom=0.1, color=None):
             image[:, :, i] = np.where(mask, rgb[i], image[:, :, i])
 
     return OffsetImage(image, zoom=zoom)
-
-
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# 4. WEATHER FORECAST FROM FMI (ONLINE)
-# ═══════════════════════════════════════════════════════════════════════════
-
-def get_tomorrow_forecast(lat, lon):
-    """Get tomorrow's min/max/avg temperature and 6 AM temperature from FMI."""
-    import requests
-    import xml.etree.ElementTree as ET
-    from datetime import datetime, timedelta
-    
-    tomorrow = datetime.now() + timedelta(days=1)
-    start_time = tomorrow.replace(hour=0, minute=0).strftime('%Y-%m-%dT%H:%M:%SZ')
-    end_time = tomorrow.replace(hour=23, minute=59).strftime('%Y-%m-%dT%H:%M:%SZ')
-    
-    url = "https://opendata.fmi.fi/wfs"
-    params = {
-        'service': 'WFS',
-        'version': '2.0.0',
-        'request': 'getFeature',
-        'storedquery_id': 'fmi::forecast::harmonie::surface::point::multipointcoverage',
-        'latlon': f'{lat},{lon}',
-        'parameters': 'temperature',
-        'starttime': start_time,
-        'endtime': end_time
-    }
-    
-    try:
-        response = requests.get(url, params=params, timeout=10)
-        print(f"FMI connection status: {response.status_code}")
-        
-        if response.status_code != 200:
-            return None, None, None, None
-        
-        root = ET.fromstring(response.content)
-        
-        # Parse timestamps and temperatures
-        timestamps = []
-        temps = []
-        
-        # Find time positions (format: lat lon timestamp)
-        for elem in root.iter():
-            if 'positions' in elem.tag and elem.text:
-                position_data = elem.text.strip().split()
-                # Timestamps are at indices 2, 5, 8, etc.
-                for i in range(2, len(position_data), 3):
-                    timestamps.append(int(position_data[i]))
-        
-        # Find temperature values
-        for elem in root.iter():
-            if 'doubleOrNilReasonTupleList' in elem.tag:
-                values = elem.text.strip().split()
-                temps.extend([float(v) for v in values if v not in ['NaN', '']])
-
-        # Find 6 AM temperature
-        morning_temp = None
-        if timestamps and temps and len(timestamps) == len(temps):
-            target_hour = 6
-            min_diff = float('inf')
-            for timestamp, temp in zip(timestamps, temps):
-                dt = datetime.fromtimestamp(timestamp)
-                hour_diff = abs(dt.hour - target_hour)
-                if hour_diff < min_diff:
-                    min_diff = hour_diff
-                    morning_temp = temp
-
-        if temps:
-            avg_temp = sum(temps) / len(temps)
-            return min(temps), max(temps), avg_temp, morning_temp
-        else:
-            print("No temps found!")
-
-    except Exception as e:
-        print(f"Exception: {e}")
-        import traceback
-        traceback.print_exc()
-    
-    return None, None, None, None
-
-# Get weather forecast
-min_temp, max_temp, avg_temp, morning_temp = get_tomorrow_forecast(latitude, longitude)
-weather_line = f"Sää huomenna:\nmin: {min_temp:+.1f} °C maks: {max_temp:+.1f} °C\nka: {avg_temp:+.1f} °C\n".replace('.', ',') if min_temp is not None else ""
 
 # Get current time
 if custom_date is None or custom_date == "Now":
@@ -958,23 +909,23 @@ if show_info_text:
 
     # Determine phase name
     if illumination > 0.99:
-        phase_name = "Täysikuu"  # "Full moon"
+        phase_name = T['full_moon']
     elif illumination < 0.01:
-        phase_name = "Uusikuu"  # "New moon"
+        phase_name = T['new_moon']
     elif is_waxing: # Waxing, growing brighter
         if illumination > 0.55:
-            phase_name = "Kasvava kupera kuu"  # "Waxing gibbous"
+            phase_name = T['waxing_gibbous']
         elif illumination > 0.45:
-            phase_name = "Puolikuu (ensimmäinen neljännes)"  # "First quarter"
+            phase_name = T['first_quarter']
         else:
-            phase_name = "Kasvava sirppi"  # "Waxing crescent"
+            phase_name = T['waxing_crescent']
     else:  # Waning, getting darker
         if illumination > 0.55:
-            phase_name = "Vähenevä kupera kuu"  # "Waning gibbous"
+            phase_name = T['waning_gibbous']
         elif illumination > 0.45:
-            phase_name = "Puolikuu (viimeinen neljännes)"  # "Last quarter"
+            phase_name = T['last_quarter']
         else:
-            phase_name = "Vähenevä sirppi"  # "Waning crescent"
+            phase_name = T['waning_crescent']
 
     # Search for next full moon (phase 180°) within next 30 days
     next_full_moon = SearchMoonPhase(180, utc, 30)
@@ -992,35 +943,15 @@ if show_info_text:
 
 info_boxes = []
 
-# 1. Block heater alert (if needed)
-if morning_temp is not None and morning_temp < 5:
-    if morning_temp >= -5:
-        heating_time = "0,5 h"
-    elif morning_temp >= -10:
-        heating_time = "1 h"
-    else:
-        heating_time = "2 h"
-
-    warning_text = (
-        f"Lämpötila aamulla klo 6: {morning_temp:+.1f} °C\n"
-        f"Lohkolämmitin päälle {heating_time} ajaksi"
-    ).replace('.', ',')
-
-    info_boxes.append(warning_text)
-
-# 2. Moon phase
-moon_text = f"\n\n\n{phase_name}\n{days_to_full:.0f} pv täysikuuhun"
+# 1. Moon phase
+moon_text = f"\n\n\n{phase_name}\n{days_to_full:.0f} {T['days_to_full']}"
 info_boxes.append(moon_text)
 
-# 3. Weather
-if weather_line:
-    info_boxes.append(weather_line.strip())
-
-# 4. Daylight
+# 2. Daylight
 daylight_text = (
-    f"Päivänvalo huomenna:\n"
-    f"klo {sunrise_time} - {sunset_time}\n"
-    f"{daylight_hours} t {daylight_mins} min"
+    f"{T['daylight_header']}\n"
+    f"{T['daylight_time'].format(rise=sunrise_time, set=sunset_time)}\n"
+    f"{T['daylight_hours'].format(h=daylight_hours, m=daylight_mins)}"
 )
 info_boxes.append(daylight_text)
 
@@ -1041,26 +972,18 @@ for i, box_text in enumerate(reversed(info_boxes)):
     box_left = text_x - box_width
     box_bottom = current_y
     
-    rect = plt.Rectangle((box_left, box_bottom), box_width, box_height,
-                        linewidth=0.3, edgecolor='white', facecolor='none',
-                        alpha=1, zorder=10)
-    ax.add_patch(rect)
     
     # Draw text inside box (left-aligned)
     text_x_pos = box_left + box_padding
     text_y_pos = box_bottom + box_padding
     
-    is_block_box = (i == len(info_boxes) - 1)
-    text_color = 'red' if is_block_box else 'white'
-
-
     ax.text(text_x_pos, text_y_pos, box_text,
-            color=text_color, fontsize=11,
+            color='white', fontsize=11,
             ha='left', va='bottom',
             alpha=0.7, zorder=11)
     
     # Special handling for first box (moon phase) - add moon indicator
-    if i == len(info_boxes) - 2:
+    if i == len(info_boxes) - 1:
         moon_radius = 0.03
 
         # top-left inside the box
