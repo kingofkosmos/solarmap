@@ -19,19 +19,10 @@ import datetime
 # 1. TO-DO LIST
 # ═══════════════════════════════════════════════════════════════════════════
 
-#TODO: Fix text positions when offline
-#TODO: Eng/fi language option
-#TODO: Full online mode: fetch all positions from Horizons for max accuracy
 #TODO: Test different resolutions and aspect ratios
-#TODO: Reminder to shut off outside water before the first freeze after summer
 #TODO: Move supersample multiplier to configuration
 #TODO: Move magic numbers to configuration
 #TODO: Automatic wallpaper generation in Github Actions?
-#TODO: Weather info
-##      Weather alerts
-##      Rain/sleet/snow chance
-##      Cloudiness
-##      UV strength
 #TODO: Comets (Halley, Hale-Bopp)
 #TODO: Arguments for command line usage
 #TODO: Realistic elliptical orbits (enables rest of the dwarf planets & astrology)
