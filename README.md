@@ -8,11 +8,9 @@ A Python script that generates a visualization of our solar system as a desktop 
 
 - Real-time planetary positions using astronomical calculations
 - Orbital trails showing recent planetary motion
-- Major moons (Earth's Moon, Jupiter's Galilean moons, Saturn's Titan, etc.)
+- 17 largest objects (until Pluto) visualized and positions calculated
 - Asteroid belt and Kuiper belt visualization
-- Moon phase indicator
-- Weather forecast (FMI API for Finland)
-- Sunrise/sunset times
+- Sunrise/sunset times (dependant on your set location coordinates)
 - Customizable resolution and colors
 
 ## Requirements
