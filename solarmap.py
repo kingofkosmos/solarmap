@@ -66,7 +66,7 @@ planet_colors = {
 }
 
 
-# Language: 'fi' or 'en'
+# Language: 'en' for English or 'fi' for Finnish
 LANGUAGE = 'en'
 
 STRINGS = {
@@ -762,10 +762,10 @@ ax.axis('off')
 if show_info_text:
     # Calculate text position (bottom right with taskbar offset)
     if fig_aspect > 1:
-        text_x = 1.3 * aspect - 0.07
+        text_x = 1.4 * aspect - 0.07
         text_y = -1.2 + (taskbar_offset * 2.6)
     else:
-        text_x = 1.3 - 0.07
+        text_x = 1.4 - 0.07
         text_y = (-1.3 / aspect) + (taskbar_offset * 2.6) + 0.1
 
     # Convert astronomy Time to Python datetime in UTC
@@ -787,8 +787,9 @@ if show_info_text:
     sunrise_local = sunrise_utc.astimezone(ZoneInfo('Europe/Helsinki'))
     sunset_local = sunset_utc.astimezone(ZoneInfo('Europe/Helsinki'))
 
-    sunrise_time = f"{sunrise_local.hour}.{sunrise_local.minute:02d}"
-    sunset_time = f"{sunset_local.hour}.{sunset_local.minute:02d}"
+    time_sep = '.' if LANGUAGE == 'fi' else ':'
+    sunrise_time = f"{sunrise_local.hour}{time_sep}{sunrise_local.minute:02d}"
+    sunset_time = f"{sunset_local.hour}{time_sep}{sunset_local.minute:02d}"
 
     # Calculate daylight hours
     daylight_duration = sunset_local - sunrise_local
