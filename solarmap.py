@@ -66,7 +66,7 @@ planet_colors = {
 }
 
 
-# Language: 'fi' or 'en'
+# Language: 'en' for English or 'fi' for Finnish
 LANGUAGE = 'en'
 
 STRINGS = {
@@ -182,16 +182,110 @@ else:
 planets = [Body.Mercury, Body.Venus, Body.Earth, Body.Mars,
     Body.Jupiter, Body.Saturn, Body.Uranus, Body.Neptune, Body.Pluto]
 
+# Horizons body IDs
+HORIZONS_IDS = {
+    'Mercury': '199',
+    'Venus':   '299',
+    'Earth':   '399',
+    'Mars':    '499',
+    'Jupiter': '599',
+    'Saturn':  '699',
+    'Uranus':  '799',
+    'Neptune': '899',
+    'Pluto':   '999',
+}
 
-# Calculate longitudes (angles from the Sun)
-longitudes = {planet.name: EclipticLongitude(planet, utc) for planet in planets}
+def get_horizons_longitude(body_id, date_str):
+    import requests
+    url = "https://ssd.jpl.nasa.gov/api/horizons.api"
+    params = {
+        "format":      "json",
+        "COMMAND":     body_id,
+        "OBJ_DATA":    "NO",
+        "MAKE_EPHEM":  "YES",
+        "EPHEM_TYPE":  "VECTORS",
+        "CENTER":      "500@10",      # Sun-centered
+        "REF_PLANE":   "ECLIPTIC",
+        "START_TIME":  date_str,
+        "STOP_TIME":   date_str + "T00:01",
+        "STEP_SIZE":   "1d",
+        "VEC_TABLE":   "2",           # Position only (X, Y, Z)
+    }
+    try:
+        r = requests.get(url, params=params, timeout=15)
+        r.raise_for_status()
+        result = r.json().get("result", "")
+
+        r.raise_for_status()
+        print(f"HTTP status: {r.status_code}")
+        raw = r.json()
+        if 'error' in raw:
+            print(f"Horizons error: {raw['error']}")
+            return None
+        print(f"JSON keys: {raw.keys()}")
+        result = raw.get("result", "")
+        print(f"Result length: {len(result)}")
+
+        soe = result.find("$$SOE")
+        eoe = result.find("$$EOE")
+        if soe == -1 or eoe == -1:
+            print(f"Horizons: no data block for {body_id}")
+            return None
+        
+        if soe == -1 or eoe == -1:
+            print(f"Horizons: no data block for {body_id}")
+            print(f"--- RAW RESPONSE (first 2000 chars) ---")
+            print(result[:2000])
+            print(f"--- END ---")
+            return None
+
+        # Vector table: line 1 = timestamp, line 2 = X Y Z, line 3 = VX VY VZ
+        lines = result[soe+5:eoe].strip().splitlines()
+        # Join all lines and extract X, Y values
+        data = " ".join(lines)
+        x = float(data.split("X =")[1].split()[0])
+        y = float(data.split("Y =")[1].split()[0])
+
+        longitude = math.degrees(math.atan2(y, x)) % 360
+        print(f"Horizons {body_id}: lon={longitude:.4f}°")
+        return longitude
+
+    except Exception as e:
+        print(f"Horizons fetch failed for {body_id}: {e}")
+        return None
+
+        data_line = result[soe+5:eoe].strip().splitlines()[0]
+        # Columns: Date, blank, hEcl-Lon, hEcl-Lat, r
+        parts = data_line.split()
+        longitude = float(parts[2])
+        print(f"Horizons {body_id}: lon={longitude:.4f}°")
+        return longitude
+
+    except Exception as e:
+        print(f"Horizons fetch failed for {body_id}: {e}")
+        return None
+
+
+# Format current date for Horizons
+cal = utc.Calendar()
+horizons_date = f"{int(cal[0])}-{int(cal[1]):02d}-{int(cal[2]):02d}"
+
+# Fetch longitudes from Horizons (one request per planet)
+print("Fetching planet positions from JPL Horizons...")
+longitudes = {}
+for planet in planets:
+    name = planet.name
+    body_id = HORIZONS_IDS[name]
+    lon = get_horizons_longitude(body_id, horizons_date)
+    if lon is None:
+        raise RuntimeError(f"Failed to fetch position for {name}, aborting.")
+    longitudes[name] = lon
 
 def longitude_to_theta(longitude):
     """Convert ecliptic longitude to plotting angle (radians)."""
     L = longitude % 360
     theta_deg = 0 - L
     return math.radians(-theta_deg)
-
 
 
 
@@ -762,10 +856,10 @@ ax.axis('off')
 if show_info_text:
     # Calculate text position (bottom right with taskbar offset)
     if fig_aspect > 1:
-        text_x = 1.3 * aspect - 0.07
+        text_x = 1.4 * aspect - 0.07
         text_y = -1.2 + (taskbar_offset * 2.6)
     else:
-        text_x = 1.3 - 0.07
+        text_x = 1.4 - 0.07
         text_y = (-1.3 / aspect) + (taskbar_offset * 2.6) + 0.1
 
     # Convert astronomy Time to Python datetime in UTC
@@ -787,8 +881,9 @@ if show_info_text:
     sunrise_local = sunrise_utc.astimezone(ZoneInfo('Europe/Helsinki'))
     sunset_local = sunset_utc.astimezone(ZoneInfo('Europe/Helsinki'))
 
-    sunrise_time = f"{sunrise_local.hour}.{sunrise_local.minute:02d}"
-    sunset_time = f"{sunset_local.hour}.{sunset_local.minute:02d}"
+    time_sep = '.' if LANGUAGE == 'fi' else ':'
+    sunrise_time = f"{sunrise_local.hour}{time_sep}{sunrise_local.minute:02d}"
+    sunset_time = f"{sunset_local.hour}{time_sep}{sunset_local.minute:02d}"
 
     # Calculate daylight hours
     daylight_duration = sunset_local - sunrise_local
