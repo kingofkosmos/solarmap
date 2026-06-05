@@ -1,4 +1,4 @@
-from astronomy import Time, Body, EclipticLongitude, GeoVector, Observer, SearchRiseSet, Direction, Illumination, SearchMoonPhase, JupiterMoons
+from astronomy import Time, Body, Observer, SearchRiseSet, Direction, Illumination, SearchMoonPhase
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from matplotlib.colors import hex2color
 from functools import lru_cache
@@ -22,7 +22,6 @@ import datetime
 #TODO: Test different resolutions and aspect ratios
 #TODO: Move supersample multiplier to configuration
 #TODO: Move magic numbers to configuration
-#TODO: Automatic wallpaper generation in Github Actions?
 #TODO: Comets (Halley, Hale-Bopp)
 #TODO: Arguments for command line usage
 #TODO: Realistic elliptical orbits (enables rest of the dwarf planets & astrology)
@@ -129,7 +128,7 @@ STARS_CONFIG = {
 # 3. PLANET POSITION CALCULATIONS
 # ═══════════════════════════════════════════════════════════════════════════
 
-def plot_fading_arc(ax, cx, cy, r, theta_start, theta_end, color, linewidth=1.0, n=50, alpha_start=0.6, alpha_end=0.0):
+def plot_fading_arc(ax, cx, cy, r, theta_start, theta_end, color, linewidth=1.0, n=200, alpha_start=0.6, alpha_end=0.0):
     """Plot an arc with fading alpha from start to end."""
     theta_range = np.linspace(theta_start, theta_end, n)
     
@@ -195,7 +194,7 @@ HORIZONS_IDS = {
     'Pluto':   '999',
 }
 
-def get_horizons_longitude(body_id, date_str):
+def get_horizons_longitude(body_id, date_str, center="500@10", name=None):
     import requests
     url = "https://ssd.jpl.nasa.gov/api/horizons.api"
     params = {
@@ -204,61 +203,36 @@ def get_horizons_longitude(body_id, date_str):
         "OBJ_DATA":    "NO",
         "MAKE_EPHEM":  "YES",
         "EPHEM_TYPE":  "VECTORS",
-        "CENTER":      "500@10",      # Sun-centered
+        "CENTER":      center,
         "REF_PLANE":   "ECLIPTIC",
         "START_TIME":  date_str,
         "STOP_TIME":   date_str + "T00:01",
         "STEP_SIZE":   "1d",
-        "VEC_TABLE":   "2",           # Position only (X, Y, Z)
+        "VEC_TABLE":   "2",
     }
     try:
         r = requests.get(url, params=params, timeout=15)
         r.raise_for_status()
-        result = r.json().get("result", "")
-
-        r.raise_for_status()
-        print(f"HTTP status: {r.status_code}")
         raw = r.json()
         if 'error' in raw:
             print(f"Horizons error: {raw['error']}")
             return None
-        print(f"JSON keys: {raw.keys()}")
         result = raw.get("result", "")
-        print(f"Result length: {len(result)}")
 
         soe = result.find("$$SOE")
         eoe = result.find("$$EOE")
+        label = name if name else body_id
         if soe == -1 or eoe == -1:
-            print(f"Horizons: no data block for {body_id}")
-            return None
-        
-        if soe == -1 or eoe == -1:
-            print(f"Horizons: no data block for {body_id}")
-            print(f"--- RAW RESPONSE (first 2000 chars) ---")
-            print(result[:2000])
-            print(f"--- END ---")
+            print(f"Horizons {label} (center {center}): lon={longitude:.4f}°")
             return None
 
-        # Vector table: line 1 = timestamp, line 2 = X Y Z, line 3 = VX VY VZ
         lines = result[soe+5:eoe].strip().splitlines()
-        # Join all lines and extract X, Y values
         data = " ".join(lines)
         x = float(data.split("X =")[1].split()[0])
         y = float(data.split("Y =")[1].split()[0])
 
         longitude = math.degrees(math.atan2(y, x)) % 360
-        print(f"Horizons {body_id}: lon={longitude:.4f}°")
-        return longitude
-
-    except Exception as e:
-        print(f"Horizons fetch failed for {body_id}: {e}")
-        return None
-
-        data_line = result[soe+5:eoe].strip().splitlines()[0]
-        # Columns: Date, blank, hEcl-Lon, hEcl-Lat, r
-        parts = data_line.split()
-        longitude = float(parts[2])
-        print(f"Horizons {body_id}: lon={longitude:.4f}°")
+        print(f"Horizons {label} (center {center}): lon={longitude:.4f}°")
         return longitude
 
     except Exception as e:
@@ -276,7 +250,7 @@ longitudes = {}
 for planet in planets:
     name = planet.name
     body_id = HORIZONS_IDS[name]
-    lon = get_horizons_longitude(body_id, horizons_date)
+    lon = get_horizons_longitude(body_id, horizons_date, name=name)
     if lon is None:
         raise RuntimeError(f"Failed to fetch position for {name}, aborting.")
     longitudes[name] = lon
@@ -639,192 +613,157 @@ trojan_cloud(jupiter_r, jupiter_L, -60)   # L5
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 10. MOONS AND DWARF PLANETS
+# 10. MOONS
 # ═══════════════════════════════════════════════════════════════════════════
 
-# Jupiter's moons
-jupiter_theta = longitude_to_theta(longitudes['Jupiter'])
-jupiter_x = cx + jupiter_r * math.cos(jupiter_theta)
-jupiter_y = cy + jupiter_r * math.sin(jupiter_theta)
-jm = JupiterMoons(utc)
+# Moon orbital periods in days (for trail calculation)
+MOON_PERIODS = {
+    'Moon':     27.321,
+    'Io':        1.769,
+    'Europa':    3.551,
+    'Ganymede':  7.155,
+    'Callisto': 16.689,
+    'Titan':    15.945,
+    'Triton':    5.877,
+}
 
-jupiter_moon_data = {
+MOON_DATA = {
+    'Moon': {
+        'body_id':  '301',
+        'center':   '500@399',
+        'parent':   'Earth',
+        'orbit_r':  0.06,
+        'color':    'white',
+        'zoom':     0.11,
+        'trail_fraction': 1/2,
+        'retrograde': False,
+    },
     'Io': {
-        'vec': jm.io,
-        'orbit_r': 0.10,
-        'color': '#F4D03F',
-        'zoom': 0.11,
-        'trail_fraction': 1/4
+        'body_id':  '501',
+        'center':   '500@599',
+        'parent':   'Jupiter',
+        'orbit_r':  0.10,
+        'color':    '#F4D03F',
+        'zoom':     0.11,
+        'trail_fraction': 1/4,
+        'retrograde': False,
     },
     'Europa': {
-        'vec': jm.europa,
-        'orbit_r': 0.11,
-        'color': '#D4C5B0',
-        'zoom': 0.10,
-        'trail_fraction': 1/5
+        'body_id':  '502',
+        'center':   '500@599',
+        'parent':   'Jupiter',
+        'orbit_r':  0.11,
+        'color':    '#D4C5B0',
+        'zoom':     0.10,
+        'trail_fraction': 1/5,
+        'retrograde': False,
     },
     'Ganymede': {
-        'vec': jm.ganymede,
-        'orbit_r': 0.13,
-        'color': '#8B7E66',
-        'zoom': 0.15,
-        'trail_fraction': 1/8
+        'body_id':  '503',
+        'center':   '500@599',
+        'parent':   'Jupiter',
+        'orbit_r':  0.13,
+        'color':    '#8B7E66',
+        'zoom':     0.15,
+        'trail_fraction': 1/8,
+        'retrograde': False,
     },
     'Callisto': {
-        'vec': jm.callisto,
-        'orbit_r': 0.14,
-        'color': '#4A4A4A',
-        'zoom': 0.13,
-        'trail_fraction': 1/10
-    }
+        'body_id':  '504',
+        'center':   '500@599',
+        'parent':   'Jupiter',
+        'orbit_r':  0.14,
+        'color':    '#4A4A4A',
+        'zoom':     0.13,
+        'trail_fraction': 1/10,
+        'retrograde': False,
+    },
+    'Titan': {
+        'body_id':  '606',
+        'center':   '500@699',
+        'parent':   'Saturn',
+        'orbit_r':  0.11,
+        'color':    '#FFA500',
+        'zoom':     0.14,
+        'trail_fraction': 1/8,
+        'retrograde': False,
+    },
+    'Triton': {
+        'body_id':  '801',
+        'center':   '500@899',
+        'parent':   'Neptune',
+        'orbit_r':  0.08,
+        'color':    '#E6E6FA',
+        'zoom':     0.09,
+        'trail_fraction': 1/2,
+        'retrograde': True,
+    },
 }
 
-for moon_name, data in jupiter_moon_data.items():
-    moon_vec = data['vec']
+# Fetch all moon positions
+print("Fetching moon positions from JPL Horizons...")
+moon_longitudes = {}
+for moon_name, data in MOON_DATA.items():
+    lon = get_horizons_longitude(data['body_id'], horizons_date, center=data['center'], name=moon_name)
+    if lon is None:
+        raise RuntimeError(f"Failed to fetch position for {moon_name}, aborting.")
+    moon_longitudes[moon_name] = lon
 
-    angle = math.degrees(math.atan2(moon_vec.y, moon_vec.x))
-    theta = math.radians(-(0 - angle))
+# Pre-compute parent planet positions (Earth already stored, compute others)
+jupiter_theta = longitude_to_theta(longitudes['Jupiter'])
+jupiter_r     = planet_radii['Jupiter']
+jupiter_x     = cx + jupiter_r * math.cos(jupiter_theta)
+jupiter_y     = cy + jupiter_r * math.sin(jupiter_theta)
 
-    r = data['orbit_r']
-    x = jupiter_x + r * math.cos(theta)
-    y = jupiter_y + r * math.sin(theta)
+saturn_theta  = longitude_to_theta(longitudes['Saturn'])
+saturn_r      = planet_radii['Saturn']
+saturn_x      = cx + saturn_r * math.cos(saturn_theta)
+saturn_y      = cy + saturn_r * math.sin(saturn_theta)
 
-    # Plot moon
-    imagebox = svg_to_imagebox("icons/moon.svg",
-                               zoom=data['zoom'],
-                               color=data['color'])
-    ax.add_artist(AnnotationBbox(imagebox, (x, y), frameon=False))
+neptune_theta = longitude_to_theta(longitudes['Neptune'])
+neptune_r     = planet_radii['Neptune']
+neptune_x     = cx + neptune_r * math.cos(neptune_theta)
+neptune_y     = cy + neptune_r * math.sin(neptune_theta)
 
-    # Trail
-    current_theta_deg = 0 - angle
-    arc_span = 360 * data['trail_fraction']
-
-    theta_start = math.radians(-current_theta_deg)
-    theta_end = math.radians(-(current_theta_deg + arc_span))
-
-    plot_fading_arc(ax, jupiter_x, jupiter_y, r,
-                    theta_start, theta_end,
-                    data['color'], linewidth=0.8)
-
-# Earth's Moon
-earth_moon_data = {
-    'Moon': {
-        'orbit_r': 0.06,
-        'color': 'white',
-        'zoom': 0.11,
-        'trail_fraction': 1/2
-    }
+parent_positions = {
+    'Earth':   (earth_x,   earth_y),
+    'Jupiter': (jupiter_x, jupiter_y),
+    'Saturn':  (saturn_x,  saturn_y),
+    'Neptune': (neptune_x, neptune_y),
 }
 
-for moon_name, data in earth_moon_data.items():
-    # Get position from astronomy library
-    moon_vec = GeoVector(Body.Moon, utc, True)
-    moon_angle = math.degrees(math.atan2(moon_vec.y, moon_vec.x))
-    moon_theta_deg = 0 - moon_angle
-    moon_theta = math.radians(-moon_theta_deg)
-    
-    x = earth_x + data['orbit_r'] * math.cos(moon_theta)
-    y = earth_y + data['orbit_r'] * math.sin(moon_theta)
-    
-    # Plot moon
+# Plot all moons
+for moon_name, data in MOON_DATA.items():
+    lon        = moon_longitudes[moon_name]
+    parent     = data['parent']
+    px, py     = parent_positions[parent]
+    orbit_r    = data['orbit_r']
+    period     = MOON_PERIODS[moon_name]
+    retrograde = data['retrograde']
+
+    # Current position
+    theta = math.radians(-(0 - lon))
+    x = px + orbit_r * math.cos(theta)
+    y = py + orbit_r * math.sin(theta)
+
+    # Plot icon
     imagebox = svg_to_imagebox("icons/moon.svg", zoom=data['zoom'], color=data['color'])
     ax.add_artist(AnnotationBbox(imagebox, (x, y), frameon=False))
-    
-    # Plot trail
-    arc_span = 360 * data['trail_fraction']
-    theta_start = math.radians(-moon_theta_deg)
-    theta_end = math.radians(-(moon_theta_deg + arc_span))
-    
-    plot_fading_arc(ax, earth_x, earth_y, data['orbit_r'], theta_start, theta_end, data['color'], linewidth=1.0)
 
-# Neptune's moon Triton
-neptune_theta = longitude_to_theta(longitudes['Neptune'])
-neptune_r_plot = planet_radii['Neptune']
-neptune_x = cx + neptune_r_plot * math.cos(neptune_theta)
-neptune_y = cy + neptune_r_plot * math.sin(neptune_theta)
+# Trail — cap at one full orbit
+    max_degrees = 360.0
+    degrees_back = 360.0 * data['trail_fraction']
+    current_theta_deg = 0 - lon
+    arc_span = degrees_back
 
-epoch_jd_2025 = 2460676.5 # Reference epoch: January 1, 2025, 00:00 UTC (JD 2460676.5)
-days_since_epoch = utc.ut - epoch_jd_2025
-
-neptune_moon_data = {
-    'Triton': {
-        'epoch_angle': 2.733989,
-        'period': 5.877,
-        'orbit_r': 0.08,
-        'color': '#E6E6FA',
-        'zoom': 0.09,
-        'trail_fraction': 1/2,
-        'retrograde': True  # Triton orbits backwards
-    }
-}
-
-for moon_name, data in neptune_moon_data.items():
-    # Calculate position (retrograde uses subtraction instead of addition)
-    if data.get('retrograde', False):
-        angle = (data['epoch_angle'] - days_since_epoch / data['period'] * 360) % 360
-    else:
-        angle = (data['epoch_angle'] + days_since_epoch / data['period'] * 360) % 360
-    
-    theta = math.radians(-(0 - angle))
-    
-    x = neptune_x + data['orbit_r'] * math.cos(theta)
-    y = neptune_y + data['orbit_r'] * math.sin(theta)
-    
-    # Plot moon
-    moon_color = data['color']
-    imagebox = svg_to_imagebox("icons/moon.svg", zoom=data['zoom'], color=moon_color)
-    ax.add_artist(AnnotationBbox(imagebox, (x, y), frameon=False))
-    
-    # Plot trail (reverse direction for retrograde)
-    current_theta_deg = 0 - angle
-    arc_span = 360 * data['trail_fraction']
-    
     theta_start = math.radians(-current_theta_deg)
-    if data.get('retrograde', False):
+    if retrograde:
         theta_end = math.radians(-(current_theta_deg - arc_span))
     else:
         theta_end = math.radians(-(current_theta_deg + arc_span))
-    
-    plot_fading_arc(ax, neptune_x, neptune_y, data['orbit_r'], theta_start, theta_end, moon_color, linewidth=0.7)
 
-# Saturn's moon Titan
-saturn_theta = longitude_to_theta(longitudes['Saturn'])
-saturn_r = planet_radii['Saturn']
-saturn_x = cx + saturn_r * math.cos(saturn_theta)
-saturn_y = cy + saturn_r * math.sin(saturn_theta)
-
-saturn_moon_data = {
-    'Titan': {
-        'epoch_angle': 356.104439,
-        'period': 15.945,
-        'orbit_r': 0.11,
-        'color': '#FFA500',
-        'zoom': 0.14,
-        'trail_fraction': 1/8
-    }
-}
-
-for moon_name, data in saturn_moon_data.items():
-    # Calculate position
-    angle = (data['epoch_angle'] + days_since_epoch / data['period'] * 360) % 360
-    theta = math.radians(-(0 - angle))
-    
-    x = saturn_x + data['orbit_r'] * math.cos(theta)
-    y = saturn_y + data['orbit_r'] * math.sin(theta)
-    
-    # Plot Saturn's moon
-    moon_color = data['color']
-    imagebox = svg_to_imagebox("icons/moon.svg", zoom=data['zoom'], color=moon_color)
-    ax.add_artist(AnnotationBbox(imagebox, (x, y), frameon=False))
-    
-    # Plot trail
-    current_theta_deg = 0 - angle
-    arc_span = 360 * data['trail_fraction']
-    
-    theta_start = math.radians(-current_theta_deg)
-    theta_end = math.radians(-(current_theta_deg + arc_span))
-    
-    plot_fading_arc(ax, saturn_x, saturn_y, data['orbit_r'], theta_start, theta_end, moon_color, linewidth=0.8)
+    plot_fading_arc(ax, px, py, orbit_r, theta_start, theta_end,
+                    data['color'], linewidth=0.8)
 
 
 
