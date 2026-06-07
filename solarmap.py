@@ -1,4 +1,3 @@
-from astronomy import Time, Body, Observer, SearchRiseSet, Direction, Illumination, SearchMoonPhase
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from matplotlib.colors import hex2color
 from functools import lru_cache
@@ -165,21 +164,16 @@ def svg_to_imagebox(svg_path, zoom=0.1, color=None):
 
 # Get current time
 if custom_date is None or custom_date == "Now":
-    utc = Time.Now()
+    utc = datetime.datetime.now(datetime.timezone.utc)
 elif ' ' in custom_date:
-    # Format with time: "YYYY-MM-DD HH:MM"
-    date_part, time_part = custom_date.split(' ')
-    year, month, day = map(int, date_part.split('-'))
-    hour, minute = map(int, time_part.split(':'))
-    utc = Time.Make(year, month, day, hour, minute, 0)
+    utc = datetime.datetime.strptime(custom_date, "%Y-%m-%d %H:%M").replace(tzinfo=datetime.timezone.utc)
 else:
-    # Format without time: "YYYY-MM-DD"
-    year, month, day = map(int, custom_date.split('-'))
-    utc = Time.Make(year, month, day, 0, 0, 0)
+    utc = datetime.datetime.strptime(custom_date, "%Y-%m-%d").replace(tzinfo=datetime.timezone.utc)
+
+horizons_date = utc.strftime("%Y-%m-%d")
 
 # Planet list
-planets = [Body.Mercury, Body.Venus, Body.Earth, Body.Mars,
-    Body.Jupiter, Body.Saturn, Body.Uranus, Body.Neptune, Body.Pluto]
+planets = ['Mercury', 'Venus', 'Earth', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto']
 
 # Horizons body IDs
 HORIZONS_IDS = {
@@ -240,15 +234,10 @@ def get_horizons_longitude(body_id, date_str, center="500@10", name=None):
         return None
 
 
-# Format current date for Horizons
-cal = utc.Calendar()
-horizons_date = f"{int(cal[0])}-{int(cal[1]):02d}-{int(cal[2]):02d}"
-
 # Fetch longitudes from Horizons (one request per planet)
 print("Fetching planet positions from JPL Horizons...")
 longitudes = {}
-for planet in planets:
-    name = planet.name
+for name in planets:
     body_id = HORIZONS_IDS[name]
     lon = get_horizons_longitude(body_id, horizons_date, name=name)
     if lon is None:
@@ -321,7 +310,7 @@ for i, r in enumerate(rings[:-1]):  # All rings except the last one
         plt.Circle((cx, cy), r, fill=False, linewidth=0.4, color='white', alpha=0.4, linestyle=(0, (13, 16))))
 
 # Radii for each planet
-planet_radii = {p.name: rings[i] for i, p in enumerate(planets)}
+planet_radii = {p: rings[i] for i, p in enumerate(planets)}
 
 
 
@@ -450,10 +439,7 @@ orbital_periods = {
     'Pluto': 90560
 }
 
-for planet in planets:
-    name = planet.name
-
-    # Skip Pluto's trail
+for name in planets:
     if name == 'Pluto':
         continue
 
@@ -792,6 +778,60 @@ ax.axis('off')
 # 12. BOTTOM RIGHT INFO
 # ═══════════════════════════════════════════════════════════════════════════
 
+def get_sun_moon_data(lat, lon, date_str):
+    """
+    Fetch sunrise, sunset, moon phase and illumination from sunrisesunset.io.
+    Returns dict or raises RuntimeError on failure.
+    """
+    import requests
+    url = "https://api.sunrisesunset.io/json"
+    params = {
+        "lat":         lat,
+        "lng":         lon,
+        "date":        date_str,
+        "time_format": "24",
+    }
+    try:
+        r = requests.get(url, params=params, timeout=15)
+        r.raise_for_status()
+        data = r.json()
+        if data.get('status') != 'OK':
+            raise RuntimeError(f"sunrisesunset.io error: {data.get('status')}")
+        return data['results']
+    except Exception as e:
+        raise RuntimeError(f"sunrisesunset.io fetch failed: {e}")
+
+
+def get_next_full_moon(date_str):
+    """
+    Fetch next full moon date from USNO API.
+    Returns days until next full moon as float.
+    """
+    import requests
+    url = "https://aa.usno.navy.mil/api/moon/phases/date"
+    params = {
+        "date": date_str,
+        "nump": 4,
+    }
+    try:
+        r = requests.get(url, params=params, timeout=15)
+        r.raise_for_status()
+        phases = r.json().get('phasedata', [])
+        # phase 2 = Full Moon
+        for phase in phases:
+            if phase['phase'] == 'Full Moon':
+                fm_date = datetime.datetime(
+                    phase['year'], phase['month'], phase['day'],
+                    *map(int, phase['time'].split(':'))
+                ).replace(tzinfo=datetime.timezone.utc)
+                now = datetime.datetime.strptime(
+                    date_str, "%Y-%m-%d"
+                ).replace(tzinfo=datetime.timezone.utc)
+                return (fm_date - now).total_seconds() / 86400
+        raise RuntimeError("No full moon found in USNO response")
+    except Exception as e:
+        raise RuntimeError(f"USNO full moon fetch failed: {e}")
+    
 if show_info_text:
     # Calculate text position (bottom right with taskbar offset)
     if fig_aspect > 1:
@@ -801,75 +841,54 @@ if show_info_text:
         text_x = 1.4 - 0.07
         text_y = (-1.3 / aspect) + (taskbar_offset * 2.6) + 0.1
 
-    # Convert astronomy Time to Python datetime in UTC
-    cal = [int(x) for x in utc.Calendar()[:6]]
-    dt_utc = datetime.datetime(*cal, tzinfo=datetime.timezone.utc)
+if show_info_text:
+    # Fetch everything from sunrisesunset.io
+    print("Fetching sun/moon data from sunrisesunset.io...")
+    sun_moon = get_sun_moon_data(latitude, longitude, horizons_date)
 
-    # Get sunrise and sunset for today
-    observer = Observer(latitude, longitude, 0)
-    sunrise_time_obj = SearchRiseSet(Body.Sun, observer, Direction.Rise, utc, 1)
-    sunset_time_obj = SearchRiseSet(Body.Sun, observer, Direction.Set, utc, 1)
+    # Timezone (for reference, already baked into returned times)
+    tz_name    = sun_moon.get('timezone', 'UTC')
+    utc_offset = sun_moon.get('utc_offset', 0)
 
-    # Convert to local time
-    sunrise_cal = sunrise_time_obj.Calendar()
-    sunset_cal = sunset_time_obj.Calendar()
+    # Sunrise / sunset
+    sunrise_raw = sun_moon['sunrise']   # e.g. "05:12:34"
+    sunset_raw  = sun_moon['sunset']    # e.g. "22:47:11"
 
-    sunrise_utc = datetime.datetime(*[int(x) for x in sunrise_cal[:6]], tzinfo=datetime.timezone.utc)
-    sunset_utc = datetime.datetime(*[int(x) for x in sunset_cal[:6]], tzinfo=datetime.timezone.utc)
-
-    sunrise_local = sunrise_utc.astimezone(ZoneInfo('Europe/Helsinki'))
-    sunset_local = sunset_utc.astimezone(ZoneInfo('Europe/Helsinki'))
+    sunrise_h, sunrise_m = int(sunrise_raw.split(':')[0]), int(sunrise_raw.split(':')[1])
+    sunset_h,  sunset_m  = int(sunset_raw.split(':')[0]),  int(sunset_raw.split(':')[1])
 
     time_sep = '.' if LANGUAGE == 'fi' else ':'
-    sunrise_time = f"{sunrise_local.hour}{time_sep}{sunrise_local.minute:02d}"
-    sunset_time = f"{sunset_local.hour}{time_sep}{sunset_local.minute:02d}"
+    sunrise_time = f"{sunrise_h}{time_sep}{sunrise_m:02d}"
+    sunset_time  = f"{sunset_h}{time_sep}{sunset_m:02d}"
 
-    # Calculate daylight hours
-    daylight_duration = sunset_local - sunrise_local
-    daylight_hours = daylight_duration.seconds // 3600
-    daylight_mins = (daylight_duration.seconds % 3600) // 60
+    daylight_total_mins = (sunset_h * 60 + sunset_m) - (sunrise_h * 60 + sunrise_m)
+    daylight_hours = daylight_total_mins // 60
+    daylight_mins  = daylight_total_mins % 60
 
+    # Moon illumination (returned as percentage string e.g. "72")
+    illumination = float(sun_moon.get('moon_illumination', 0)) / 100.0
 
+    # Moon phase name and waxing/waning
+    phase_str = sun_moon.get('moon_phase', '')
 
+    PHASE_MAP = {
+        'Full Moon':         ('full_moon',       None),
+        'New Moon':          ('new_moon',        None),
+        'Waxing Gibbous':    ('waxing_gibbous',  True),
+        'First Quarter':     ('first_quarter',   True),
+        'Waxing Crescent':   ('waxing_crescent', True),
+        'Waning Gibbous':    ('waning_gibbous',  False),
+        'Last Quarter':      ('last_quarter',    False),
+        'Waning Crescent':   ('waning_crescent', False),
+    }
 
-# ═══════════════════════════════════════════════════════════════════════════
-# 12.1 MOON PHASE
-# ═══════════════════════════════════════════════════════════════════════════
+    key, is_waxing_val = PHASE_MAP.get(phase_str, ('waxing_crescent', True))
+    phase_name = T[key]
+    is_waxing  = is_waxing_val if is_waxing_val is not None else (illumination > 0.99)
 
-    # Get moon phase info
-    illum = Illumination(Body.Moon, utc)
-    phase_angle = illum.phase_angle
-    illumination = illum.phase_fraction
-
-    # Determine waxing vs waning by checking if illumination is increasing
-    # Sample 1 hour later to see if moon is getting brighter or darker
-    future_illum = Illumination(Body.Moon, utc.AddDays(1.0/24.0))
-    is_waxing = future_illum.phase_fraction > illumination
-
-    # Determine phase name
-    if illumination > 0.99:
-        phase_name = T['full_moon']
-    elif illumination < 0.01:
-        phase_name = T['new_moon']
-    elif is_waxing: # Waxing, growing brighter
-        if illumination > 0.55:
-            phase_name = T['waxing_gibbous']
-        elif illumination > 0.45:
-            phase_name = T['first_quarter']
-        else:
-            phase_name = T['waxing_crescent']
-    else:  # Waning, getting darker
-        if illumination > 0.55:
-            phase_name = T['waning_gibbous']
-        elif illumination > 0.45:
-            phase_name = T['last_quarter']
-        else:
-            phase_name = T['waning_crescent']
-
-    # Search for next full moon (phase 180°) within next 30 days
-    next_full_moon = SearchMoonPhase(180, utc, 30)
-    days_to_full = next_full_moon.ut - utc.ut  # Difference in days
-
+    # Days to next full moon
+    print("Fetching next full moon from USNO...")
+    days_to_full = get_next_full_moon(horizons_date)
 
 
 
@@ -877,8 +896,7 @@ if show_info_text:
 # 12.2 PLOT INFO TEXT
 # ═══════════════════════════════════════════════════════════════════════════
 
-    cal = utc.Calendar()
-    date_str = f"{int(cal[0])}-{int(cal[1]):02d}-{int(cal[2]):02d}"
+date_str = horizons_date
 
 info_boxes = []
 
