@@ -3,6 +3,7 @@ from matplotlib.colors import hex2color
 from functools import lru_cache
 from zoneinfo import ZoneInfo
 from PIL import Image
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import math
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
@@ -18,6 +19,7 @@ import datetime
 # 1. TO-DO LIST
 # ═══════════════════════════════════════════════════════════════════════════
 
+#TODO: Moon parallactic angle (tilt) based on observer's latitude and moon's position
 #TODO: Test different resolutions and aspect ratios
 #TODO: Move supersample multiplier to configuration
 #TODO: Move magic numbers to configuration
@@ -190,6 +192,7 @@ HORIZONS_IDS = {
 
 def get_horizons_longitude(body_id, date_str, center="500@10", name=None):
     import requests
+    import time
     url = "https://ssd.jpl.nasa.gov/api/horizons.api"
     params = {
         "format":      "json",
@@ -204,45 +207,70 @@ def get_horizons_longitude(body_id, date_str, center="500@10", name=None):
         "STEP_SIZE":   "1d",
         "VEC_TABLE":   "2",
     }
-    try:
-        r = requests.get(url, params=params, timeout=15)
-        r.raise_for_status()
-        raw = r.json()
-        if 'error' in raw:
-            print(f"Horizons error: {raw['error']}")
-            return None
-        result = raw.get("result", "")
-
-        soe = result.find("$$SOE")
-        eoe = result.find("$$EOE")
-        label = name if name else body_id
-        if soe == -1 or eoe == -1:
+    label = name if name else body_id
+    for attempt in range(5):
+        try:
+            r = requests.get(url, params=params, timeout=15)
+            if r.status_code == 503:
+                wait = 2 ** attempt
+                print(f"Horizons 503 for {label}, retrying in {wait}s...")
+                time.sleep(wait)
+                continue
+            r.raise_for_status()
+            raw = r.json()
+            if 'error' in raw:
+                print(f"Horizons error: {raw['error']}")
+                return None
+            result = raw.get("result", "")
+            soe = result.find("$$SOE")
+            eoe = result.find("$$EOE")
+            if soe == -1 or eoe == -1:
+                print(f"Horizons: no data block for {label}")
+                return None
+            lines = result[soe+5:eoe].strip().splitlines()
+            data = " ".join(lines)
+            x = float(data.split("X =")[1].split()[0])
+            y = float(data.split("Y =")[1].split()[0])
+            longitude = math.degrees(math.atan2(y, x)) % 360
             print(f"Horizons {label} (center {center}): lon={longitude:.4f}°")
-            return None
+            return longitude
+        except Exception as e:
+            print(f"Horizons fetch failed for {label}: {e}")
+            time.sleep(2 ** attempt)
+    return None
 
-        lines = result[soe+5:eoe].strip().splitlines()
-        data = " ".join(lines)
-        x = float(data.split("X =")[1].split()[0])
-        y = float(data.split("Y =")[1].split()[0])
+def fetch_all_horizons(fetch_list, date_str):
+    import time
+    results = {}
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = {}
+        for item in fetch_list:
+            future = executor.submit(
+                get_horizons_longitude,
+                item['body_id'],
+                date_str,
+                item['center'],
+                item['name']
+            )
+            futures[future] = item['name']
+            time.sleep(0.1)  # small stagger to avoid hammering the API
 
-        longitude = math.degrees(math.atan2(y, x)) % 360
-        print(f"Horizons {label} (center {center}): lon={longitude:.4f}°")
-        return longitude
-
-    except Exception as e:
-        print(f"Horizons fetch failed for {body_id}: {e}")
-        return None
-
+        for future in as_completed(futures):
+            name = futures[future]
+            try:
+                lon = future.result()
+            except Exception as e:
+                raise RuntimeError(f"Exception fetching {name}: {e}")
+            if lon is None:
+                raise RuntimeError(f"Failed to fetch position for {name}, aborting.")
+            results[name] = lon
+    return results
 
 # Fetch longitudes from Horizons (one request per planet)
 print("Fetching planet positions from JPL Horizons...")
-longitudes = {}
-for name in planets:
-    body_id = HORIZONS_IDS[name]
-    lon = get_horizons_longitude(body_id, horizons_date, name=name)
-    if lon is None:
-        raise RuntimeError(f"Failed to fetch position for {name}, aborting.")
-    longitudes[name] = lon
+planet_fetches = [{'name': n, 'body_id': HORIZONS_IDS[n], 'center': '500@10'} for n in planets]
+all_planet_results = fetch_all_horizons(planet_fetches, horizons_date)
+longitudes = {n: all_planet_results[n] for n in planets}
 
 def longitude_to_theta(longitude):
     """Convert ecliptic longitude to plotting angle (radians)."""
@@ -686,14 +714,10 @@ MOON_DATA = {
     },
 }
 
-# Fetch all moon positions
 print("Fetching moon positions from JPL Horizons...")
-moon_longitudes = {}
-for moon_name, data in MOON_DATA.items():
-    lon = get_horizons_longitude(data['body_id'], horizons_date, center=data['center'], name=moon_name)
-    if lon is None:
-        raise RuntimeError(f"Failed to fetch position for {moon_name}, aborting.")
-    moon_longitudes[moon_name] = lon
+moon_fetches = [{'name': n, 'body_id': d['body_id'], 'center': d['center']} for n, d in MOON_DATA.items()]
+all_moon_results = fetch_all_horizons(moon_fetches, horizons_date)
+moon_longitudes = {n: all_moon_results[n] for n in MOON_DATA}
 
 # Pre-compute parent planet positions (Earth already stored, compute others)
 jupiter_theta = longitude_to_theta(longitudes['Jupiter'])
