@@ -83,6 +83,11 @@ STRINGS = {
         'daylight_header':  'Päivänvalo huomenna:',
         'daylight_time':    'klo {rise} - {set}',
         'daylight_hours':   '{h} t {m} min',
+        'morning_temp':     'Lämpötila aamulla: {temp:.1f} °C',
+        'block_heater':     'Lohkolämmitin päälle {time} ajaksi',
+        'heating_05h':      '0,5 h',
+        'heating_1h':       '1 h',
+        'heating_2h':       '2 h',
     },
     'en': {
         'full_moon':        'Full Moon',
@@ -97,6 +102,11 @@ STRINGS = {
         'daylight_header':  'Daylight tomorrow:',
         'daylight_time':    '{rise} - {set}',
         'daylight_hours':   '{h} h {m} min',
+        'morning_temp':     'Morning temperature: {temp:.1f} °C',
+        'block_heater':     'Block heater on for {time}',
+        'heating_05h':      '0.5 h',
+        'heating_1h':       '1 h',
+        'heating_2h':       '2 h',
     }
 }
 
@@ -174,6 +184,78 @@ else:
 
 horizons_date = utc.strftime("%Y-%m-%d")
 
+def get_tomorrow_morning_temp(lat, lon):
+    """Get tomorrow's 6 AM temperature from FMI open data."""
+    import requests
+    import xml.etree.ElementTree as ET
+    from datetime import datetime, timedelta
+
+    tomorrow = datetime.now() + timedelta(days=1)
+    start_time = tomorrow.replace(hour=0, minute=0).strftime('%Y-%m-%dT%H:%M:%SZ')
+    end_time = tomorrow.replace(hour=23, minute=59).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+    url = "https://opendata.fmi.fi/wfs"
+    params = {
+        'service': 'WFS',
+        'version': '2.0.0',
+        'request': 'getFeature',
+        'storedquery_id': 'fmi::forecast::harmonie::surface::point::multipointcoverage',
+        'latlon': f'{lat},{lon}',
+        'parameters': 'temperature',
+        'starttime': start_time,
+        'endtime': end_time
+    }
+
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        print(f"FMI connection status: {response.status_code}")
+
+        if response.status_code != 200:
+            return None
+
+        root = ET.fromstring(response.content)
+
+        # Parse timestamps and temperatures
+        timestamps = []
+        temps = []
+
+        # Find time positions (format: lat lon timestamp)
+        for elem in root.iter():
+            if 'positions' in elem.tag and elem.text:
+                position_data = elem.text.strip().split()
+                # Timestamps are at indices 2, 5, 8, etc.
+                for i in range(2, len(position_data), 3):
+                    timestamps.append(int(position_data[i]))
+
+        # Find temperature values
+        for elem in root.iter():
+            if 'doubleOrNilReasonTupleList' in elem.tag:
+                values = elem.text.strip().split()
+                temps.extend([float(v) for v in values if v not in ['NaN', '']])
+
+        # Find 6 AM temperature
+        if timestamps and temps and len(timestamps) == len(temps):
+            target_hour = 6
+            min_diff = float('inf')
+            morning_temp = None
+            for timestamp, temp in zip(timestamps, temps):
+                dt = datetime.fromtimestamp(timestamp)
+                hour_diff = abs(dt.hour - target_hour)
+                if hour_diff < min_diff:
+                    min_diff = hour_diff
+                    morning_temp = temp
+            return morning_temp
+
+    except Exception as e:
+        print(f"Exception: {e}")
+        import traceback
+        traceback.print_exc()
+
+    return None
+
+# Get tomorrow's 6 AM temperature
+morning_temp = get_tomorrow_morning_temp(latitude, longitude)
+
 # Planet list
 planets = ['Mercury', 'Venus', 'Earth', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto']
 
@@ -213,29 +295,29 @@ def get_horizons_longitude(body_id, date_str, center="500@10", name=None):
             r = requests.get(url, params=params, timeout=15)
             if r.status_code == 503:
                 wait = 2 ** attempt
-                print(f"Horizons 503 for {label}, retrying in {wait}s...")
+                print(f"Information unavailable for {label}, retrying in {wait} s...")
                 time.sleep(wait)
                 continue
             r.raise_for_status()
             raw = r.json()
             if 'error' in raw:
-                print(f"Horizons error: {raw['error']}")
+                print(f"Fetch error: {raw['error']}")
                 return None
             result = raw.get("result", "")
             soe = result.find("$$SOE")
             eoe = result.find("$$EOE")
             if soe == -1 or eoe == -1:
-                print(f"Horizons: no data block for {label}")
+                print(f"No data block for {label}")
                 return None
             lines = result[soe+5:eoe].strip().splitlines()
             data = " ".join(lines)
             x = float(data.split("X =")[1].split()[0])
             y = float(data.split("Y =")[1].split()[0])
             longitude = math.degrees(math.atan2(y, x)) % 360
-            print(f"Horizons {label} (center {center}): lon={longitude:.4f}°")
+            print(f"{label} longitude fetched")
             return longitude
         except Exception as e:
-            print(f"Horizons fetch failed for {label}: {e}")
+            print(f"Fetch failed for {label}: {e}")
             time.sleep(2 ** attempt)
     return None
 
@@ -267,7 +349,7 @@ def fetch_all_horizons(fetch_list, date_str):
     return results
 
 # Fetch longitudes from Horizons (one request per planet)
-print("Fetching planet positions from JPL Horizons...")
+print("FETCHING PLANET LONGITUDES FROM JPL HORIZONS")
 planet_fetches = [{'name': n, 'body_id': HORIZONS_IDS[n], 'center': '500@10'} for n in planets]
 all_planet_results = fetch_all_horizons(planet_fetches, horizons_date)
 longitudes = {n: all_planet_results[n] for n in planets}
@@ -714,7 +796,7 @@ MOON_DATA = {
     },
 }
 
-print("Fetching moon positions from JPL Horizons...")
+print("FETCHING MOON LONGITUDES FROM JPL HORIZONS")
 moon_fetches = [{'name': n, 'body_id': d['body_id'], 'center': d['center']} for n, d in MOON_DATA.items()]
 all_moon_results = fetch_all_horizons(moon_fetches, horizons_date)
 moon_longitudes = {n: all_moon_results[n] for n in MOON_DATA}
@@ -859,15 +941,15 @@ def get_next_full_moon(date_str):
 if show_info_text:
     # Calculate text position (bottom right with taskbar offset)
     if fig_aspect > 1:
-        text_x = 1.4 * aspect - 0.07
+        text_x = 1.4 * aspect - 0.2
         text_y = -1.2 + (taskbar_offset * 2.6)
     else:
-        text_x = 1.4 - 0.07
+        text_x = 1.4 - 0.2
         text_y = (-1.3 / aspect) + (taskbar_offset * 2.6) + 0.1
 
 if show_info_text:
     # Fetch everything from sunrisesunset.io
-    print("Fetching sun/moon data from sunrisesunset.io...")
+    print("FETCHING SUN/MOON DATA FROM SUNRISESUNSET.IO")
     sun_moon = get_sun_moon_data(latitude, longitude, horizons_date)
 
     # Timezone (for reference, already baked into returned times)
@@ -922,19 +1004,38 @@ if show_info_text:
 
 date_str = horizons_date
 
-info_boxes = []
+info_boxes = []  # each item: {'text': str, 'color': str, 'is_moon': bool}
 
-# 1. Moon phase
+# 1. Block heater alert (if needed)
+print(f"Morning temperature: {morning_temp}°C, adding block heater alert.")
+if morning_temp is not None and morning_temp < 10:
+    if morning_temp >= 5: #10...5 C = 0.5h
+        heating_time = T['heating_05h']
+    elif morning_temp >= -10: #4...-10 C = 1h
+        heating_time = T['heating_1h']
+    else: #-11 C or lower = 2h
+        heating_time = T['heating_2h']
+
+    warning_text = (
+        f"{T['morning_temp'].format(temp=morning_temp)}\n"
+        f"{T['block_heater'].format(time=heating_time)}"
+    )
+    if LANGUAGE == 'fi':
+        warning_text = warning_text.replace('.', ',')
+
+    info_boxes.append({'text': warning_text, 'color': 'red', 'is_moon': False})
+
+# 2. Moon phase
 moon_text = f"\n\n\n{phase_name}\n{days_to_full:.0f} {T['days_to_full']}"
-info_boxes.append(moon_text)
+info_boxes.append({'text': moon_text, 'color': 'white', 'is_moon': True})
 
-# 2. Daylight
+# 3. Daylight
 daylight_text = (
     f"{T['daylight_header']}\n"
     f"{T['daylight_time'].format(rise=sunrise_time, set=sunset_time)}\n"
     f"{T['daylight_hours'].format(h=daylight_hours, m=daylight_mins)}"
 )
-info_boxes.append(daylight_text)
+info_boxes.append({'text': daylight_text, 'color': 'white', 'is_moon': False})
 
 
 # Draw stacked info boxes
@@ -943,28 +1044,27 @@ box_spacing = 0.0
 box_padding = 0.015
 current_y = text_y
     
-for i, box_text in enumerate(reversed(info_boxes)):
+for i, box in enumerate(reversed(info_boxes)):
+    box_text = box['text']
     # Count lines in this box
     num_lines = box_text.count('\n') + 1
     line_height = 0.035
     box_height = num_lines * line_height + 2 * box_padding - 0.01
     
-    # Draw white outline rectangle
     box_left = text_x - box_width
     box_bottom = current_y
-    
     
     # Draw text inside box (left-aligned)
     text_x_pos = box_left + box_padding
     text_y_pos = box_bottom + box_padding
     
     ax.text(text_x_pos, text_y_pos, box_text,
-            color='white', fontsize=11,
+            color=box['color'], fontsize=11,
             ha='left', va='bottom',
             alpha=0.7, zorder=11)
     
-    # Special handling for first box (moon phase) - add moon indicator
-    if i == len(info_boxes) - 1:
+    # Special handling for the moon phase box - add moon indicator
+    if box['is_moon']:
         moon_radius = 0.03
 
         # top-left inside the box
