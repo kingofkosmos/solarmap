@@ -11,6 +11,16 @@ import io
 import cairosvg
 import numpy as np
 import datetime
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "--language",
+    choices=["en", "fi"],
+    default="en",
+    help="Language for the generated map"
+)
+args = parser.parse_args()
 
 
 
@@ -24,7 +34,6 @@ import datetime
 #TODO: Move supersample multiplier to configuration
 #TODO: Move magic numbers to configuration
 #TODO: Comets (Halley, Hale-Bopp)
-#TODO: Arguments for command line usage
 #TODO: Realistic elliptical orbits (enables rest of the dwarf planets & astrology)
 ##      Astrology: Sky division to constellations, meanings of planets in different constellations
 ##      Dwarf planets: Haumea, Makemake, Eris
@@ -67,7 +76,7 @@ planet_colors = {
 
 
 # Language: 'en' for English or 'fi' for Finnish
-LANGUAGE = 'en'
+LANGUAGE = args.language
 
 STRINGS = {
     'fi': {
@@ -1009,11 +1018,11 @@ info_boxes = []  # each item: {'text': str, 'color': str, 'is_moon': bool}
 # 1. Block heater alert (if needed)
 print(f"Morning temperature: {morning_temp}°C, adding block heater alert.")
 if morning_temp is not None and morning_temp < 10:
-    if morning_temp >= 5: #10...5 C = 0.5h
+    if morning_temp >= 5: # 10...5 C = 0.5h
         heating_time = T['heating_05h']
-    elif morning_temp >= -10: #4...-10 C = 1h
+    elif morning_temp >= -10: # 4...-10 C = 1h
         heating_time = T['heating_1h']
-    else: #-11 C or lower = 2h
+    else: # -11 C or lower = 2h
         heating_time = T['heating_2h']
 
     warning_text = (
