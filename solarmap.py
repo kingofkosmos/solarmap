@@ -11,7 +11,16 @@ import io
 import cairosvg
 import numpy as np
 import datetime
+import argparse
 
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "--language",
+    choices=["en", "fi"],
+    default="en",
+    help="Language for the generated map"
+)
+args = parser.parse_args()
 
 
 
@@ -24,7 +33,6 @@ import datetime
 #TODO: Move magic numbers to configuration
 #TODO: Automatic wallpaper generation in Github Actions?
 #TODO: Comets (Halley, Hale-Bopp)
-#TODO: Arguments for command line usage
 #TODO: Realistic elliptical orbits (enables rest of the dwarf planets & astrology)
 ##      Astrology: Sky division to constellations, meanings of planets in different constellations
 ##      Dwarf planets: Haumea, Makemake, Eris
@@ -67,7 +75,7 @@ planet_colors = {
 
 
 # Language: 'en' for English or 'fi' for Finnish
-LANGUAGE = 'en'
+LANGUAGE = args.language
 
 STRINGS = {
     'fi': {
@@ -762,10 +770,10 @@ ax.axis('off')
 if show_info_text:
     # Calculate text position (bottom right with taskbar offset)
     if fig_aspect > 1:
-        text_x = 1.4 * aspect - 0.07
+        text_x = 1.4 * aspect - 0.2
         text_y = -1.2 + (taskbar_offset * 2.6)
     else:
-        text_x = 1.4 - 0.07
+        text_x = 1.4 - 0.2
         text_y = (-1.3 / aspect) + (taskbar_offset * 2.6) + 0.1
 
     # Convert astronomy Time to Python datetime in UTC
