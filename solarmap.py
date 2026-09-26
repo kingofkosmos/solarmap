@@ -97,6 +97,9 @@ STRINGS = {
         'heating_05h':      '0,5 h',
         'heating_1h':       '1 h',
         'heating_2h':       '2 h',
+        'weather_header':   'Sää huomenna:',
+        'weather_minmax':   'min: {min:.1f} °C maks: {max:.1f} °C',
+        'weather_avg':      'ka: {avg:.1f} °C',
     },
     'en': {
         'full_moon':        'Full Moon',
@@ -116,6 +119,9 @@ STRINGS = {
         'heating_05h':      '0.5 h',
         'heating_1h':       '1 h',
         'heating_2h':       '2 h',
+        'weather_header':   'Weather tomorrow:',
+        'weather_minmax':   'min: {min:.1f} °C max: {max:.1f} °C',
+        'weather_avg':      'avg: {avg:.1f} °C',
     }
 }
 
@@ -193,8 +199,8 @@ else:
 
 horizons_date = utc.strftime("%Y-%m-%d")
 
-def get_tomorrow_morning_temp(lat, lon):
-    """Get tomorrow's 6 AM temperature from FMI open data."""
+def get_tomorrow_forecast(lat, lon):
+    """Get tomorrow's min/max/avg temperature and 6 AM temperature from FMI open data."""
     import requests
     import xml.etree.ElementTree as ET
     from datetime import datetime, timedelta
@@ -220,7 +226,7 @@ def get_tomorrow_morning_temp(lat, lon):
         print(f"FMI connection status: {response.status_code}")
 
         if response.status_code != 200:
-            return None
+            return None, None, None, None
 
         root = ET.fromstring(response.content)
 
@@ -243,27 +249,32 @@ def get_tomorrow_morning_temp(lat, lon):
                 temps.extend([float(v) for v in values if v not in ['NaN', '']])
 
         # Find 6 AM temperature
+        morning_temp = None
         if timestamps and temps and len(timestamps) == len(temps):
             target_hour = 6
             min_diff = float('inf')
-            morning_temp = None
             for timestamp, temp in zip(timestamps, temps):
                 dt = datetime.fromtimestamp(timestamp)
                 hour_diff = abs(dt.hour - target_hour)
                 if hour_diff < min_diff:
                     min_diff = hour_diff
                     morning_temp = temp
-            return morning_temp
+
+        if temps:
+            avg_temp = sum(temps) / len(temps)
+            return min(temps), max(temps), avg_temp, morning_temp
+        else:
+            print("No temps found!")
 
     except Exception as e:
         print(f"Exception: {e}")
         import traceback
         traceback.print_exc()
 
-    return None
+    return None, None, None, None
 
-# Get tomorrow's 6 AM temperature
-morning_temp = get_tomorrow_morning_temp(latitude, longitude)
+# Get tomorrow's weather forecast (min/max/avg + 6 AM temp)
+min_temp, max_temp, avg_temp, morning_temp = get_tomorrow_forecast(latitude, longitude)
 
 # Planet list
 planets = ['Mercury', 'Venus', 'Earth', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto']
@@ -1016,9 +1027,9 @@ date_str = horizons_date
 info_boxes = []  # each item: {'text': str, 'color': str, 'is_moon': bool}
 
 # 1. Block heater alert (if needed)
-print(f"Morning temperature: {morning_temp}°C, adding block heater alert.")
-if morning_temp is not None and morning_temp < 10:
-    if morning_temp >= 5: # 10...5 C = 0.5h
+print(f"Morning temperature fetched.")
+if morning_temp is not None and morning_temp < 5:
+    if morning_temp >= -5: # 5...-5 C = 0.5h
         heating_time = T['heating_05h']
     elif morning_temp >= -10: # 4...-10 C = 1h
         heating_time = T['heating_1h']
@@ -1034,11 +1045,23 @@ if morning_temp is not None and morning_temp < 10:
 
     info_boxes.append({'text': warning_text, 'color': 'red', 'is_moon': False})
 
-# 2. Moon phase
+# 2. Weather summary (min/max/avg)
+if min_temp is not None:
+    weather_text = (
+        f"{T['weather_header']}\n"
+        f"{T['weather_minmax'].format(min=min_temp, max=max_temp)}\n"
+        f"{T['weather_avg'].format(avg=avg_temp)}"
+    )
+    if LANGUAGE == 'fi':
+        weather_text = weather_text.replace('.', ',')
+
+    info_boxes.append({'text': weather_text, 'color': 'white', 'is_moon': False})
+
+# 3. Moon phase
 moon_text = f"\n\n\n{phase_name}\n{days_to_full:.0f} {T['days_to_full']}"
 info_boxes.append({'text': moon_text, 'color': 'white', 'is_moon': True})
 
-# 3. Daylight
+# 4. Daylight
 daylight_text = (
     f"{T['daylight_header']}\n"
     f"{T['daylight_time'].format(rise=sunrise_time, set=sunset_time)}\n"
