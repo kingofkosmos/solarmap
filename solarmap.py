@@ -199,15 +199,131 @@ else:
 
 horizons_date = utc.strftime("%Y-%m-%d")
 
+LOCAL_TZ = ZoneInfo("Europe/Helsinki")
+
+# WeatherSymbol3 code -> (English, Finnish) short phrase.
+# Source: https://www.ilmatieteenlaitos.fi/latauspalvelun-pikaohje
+SYMBOL_PHRASES = {
+    1:  ("clear",                "selkeää"),
+    2:  ("partly cloudy",        "puolipilvistä"),
+    3:  ("cloudy",               "pilvistä"),
+    21: ("light showers",        "heikkoja sadekuuroja"),
+    22: ("showers",              "sadekuuroja"),
+    23: ("heavy showers",        "voimakkaita sadekuuroja"),
+    31: ("light rain",           "heikkoa vesisadetta"),
+    32: ("rain",                 "vesisadetta"),
+    33: ("heavy rain",           "voimakasta vesisadetta"),
+    41: ("light snow showers",   "heikkoja lumikuuroja"),
+    42: ("snow showers",         "lumikuuroja"),
+    43: ("heavy snow showers",   "voimakkaita lumikuuroja"),
+    51: ("light snowfall",       "heikkoa lumisadetta"),
+    52: ("snowfall",             "lumisadetta"),
+    53: ("heavy snowfall",       "voimakasta lumisadetta"),
+    61: ("thundershowers",       "ukkoskuuroja"),
+    62: ("heavy thundershowers", "voimakkaita ukkoskuuroja"),
+    63: ("thunder",              "ukkosta"),
+    64: ("heavy thunder",        "voimakasta ukkosta"),
+    71: ("light sleet showers",  "heikkoja räntäkuuroja"),
+    72: ("sleet showers",        "räntäkuuroja"),
+    73: ("heavy sleet showers",  "voimakkaita räntäkuuroja"),
+    81: ("light sleet",          "heikkoa räntäsadetta"),
+    82: ("sleet",                "räntäsadetta"),
+    83: ("heavy sleet",          "voimakasta räntäsadetta"),
+    91: ("mist",                 "utua"),
+    92: ("fog",                  "sumua"),
+}
+
+# Higher number = more "notable" -> wins when a segment spans mixed codes.
+# Any precipitation/thunder always outranks plain clear/cloudy/mist.
+SYMBOL_PRIORITY = {
+    1: 0, 2: 1, 3: 2,
+    91: 3, 92: 4,
+    21: 5, 22: 6, 23: 7,
+    31: 5, 32: 6, 33: 7,
+    41: 5, 42: 6, 43: 7,
+    51: 5, 52: 6, 53: 7,
+    71: 5, 72: 6, 73: 7,
+    81: 5, 82: 6, 83: 7,
+    61: 8, 62: 9,
+    63: 8, 64: 9,
+}
+
+# Four parts of day: (name, start_hour_inclusive, end_hour_exclusive)
+SEGMENTS = [
+    ("night",     0,  6),
+    ("morning",   6,  12),
+    ("afternoon", 12, 18),
+    ("evening",   18, 24),
+]
+
+SEGMENT_LABELS = {
+    "night":     ("night",     "yö"),
+    "morning":   ("morning",   "aamupäivä"),
+    "afternoon": ("afternoon", "iltapäivä"),
+    "evening":   ("evening",   "ilta"),
+}
+
+
+def dominant_symbol(codes):
+    """Pick the most 'notable' code in a list (rain/snow/thunder beat clear)."""
+    return max(codes, key=lambda c: SYMBOL_PRIORITY.get(c, 0))
+
+
+def build_segment_lines(hourly):
+    """Build short weather-condition lines per part of day, merging
+    consecutive segments that end up with the same description."""
+    lang_idx = 0 if LANGUAGE == 'en' else 1
+
+    segment_codes = {name: [] for name, _, _ in SEGMENTS}
+    for dt, temp, symbol in hourly:
+        for name, start_h, end_h in SEGMENTS:
+            if start_h <= dt.hour < end_h:
+                segment_codes[name].append(symbol)
+                break
+
+    segment_phrases = []
+    for name, _, _ in SEGMENTS:
+        codes = segment_codes[name]
+        if not codes:
+            continue
+        symbol = dominant_symbol(codes)
+        phrase = SYMBOL_PHRASES.get(symbol, ("?", "?"))[lang_idx]
+        segment_phrases.append((name, phrase))
+
+    merged = []
+    for name, phrase in segment_phrases:
+        if merged and merged[-1][1] == phrase:
+            merged[-1] = (merged[-1][0] + [name], phrase)
+        else:
+            merged.append(([name], phrase))
+
+    lines = []
+    for names, phrase in merged:
+        labels = [SEGMENT_LABELS[n][lang_idx] for n in names]
+        lines.append(f"{'/'.join(labels)}: {phrase}")
+    return lines
+
+
 def get_tomorrow_forecast(lat, lon):
-    """Get tomorrow's min/max/avg temperature and 6 AM temperature from FMI open data."""
+    """Get tomorrow's min/max/avg temperature, 6 AM temperature, and short
+    weather-condition phrases by time of day, from FMI open data."""
     import requests
     import xml.etree.ElementTree as ET
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
 
-    tomorrow = datetime.now() + timedelta(days=1)
-    start_time = tomorrow.replace(hour=0, minute=0).strftime('%Y-%m-%dT%H:%M:%SZ')
-    end_time = tomorrow.replace(hour=23, minute=59).strftime('%Y-%m-%dT%H:%M:%SZ')
+    # Tomorrow's calendar date in local (Finnish) time, independent of
+    # whatever timezone this machine happens to be set to.
+    tomorrow_date = (datetime.now(LOCAL_TZ) + timedelta(days=1)).date()
+    start_local = datetime(tomorrow_date.year, tomorrow_date.month, tomorrow_date.day,
+                            0, 0, 0, tzinfo=LOCAL_TZ)
+    end_local = start_local + timedelta(hours=23, minutes=59)
+
+    # Convert to real UTC before sending to FMI (handles EET/EEST correctly).
+    start_utc = start_local.astimezone(timezone.utc)
+    end_utc = end_local.astimezone(timezone.utc)
+
+    # Order here must match the order of values in each response tuple.
+    params_order = ["Temperature", "WeatherSymbol3"]
 
     url = "https://opendata.fmi.fi/wfs"
     params = {
@@ -216,9 +332,10 @@ def get_tomorrow_forecast(lat, lon):
         'request': 'getFeature',
         'storedquery_id': 'fmi::forecast::harmonie::surface::point::multipointcoverage',
         'latlon': f'{lat},{lon}',
-        'parameters': 'temperature',
-        'starttime': start_time,
-        'endtime': end_time
+        'parameters': ','.join(params_order),
+        'timestep': '60',
+        'starttime': start_utc.strftime('%Y-%m-%dT%H:%M:%SZ'),
+        'endtime': end_utc.strftime('%Y-%m-%dT%H:%M:%SZ'),
     }
 
     try:
@@ -226,55 +343,64 @@ def get_tomorrow_forecast(lat, lon):
         print(f"FMI connection status: {response.status_code}")
 
         if response.status_code != 200:
-            return None, None, None, None
+            return None, None, None, None, []
 
         root = ET.fromstring(response.content)
 
-        # Parse timestamps and temperatures
+        # Timestamps: "lat lon timestamp" repeated, one triplet per time step.
         timestamps = []
-        temps = []
-
-        # Find time positions (format: lat lon timestamp)
         for elem in root.iter():
             if 'positions' in elem.tag and elem.text:
-                position_data = elem.text.strip().split()
-                # Timestamps are at indices 2, 5, 8, etc.
-                for i in range(2, len(position_data), 3):
-                    timestamps.append(int(position_data[i]))
+                nums = elem.text.strip().split()
+                for i in range(2, len(nums), 3):
+                    timestamps.append(int(nums[i]))
 
-        # Find temperature values
+        # Values: flat list, grouped in chunks of len(params_order) per time
+        # step, in the SAME order as params_order. NaNs kept as None so
+        # indices stay aligned (dropping them would shift everything).
+        raw_values = []
         for elem in root.iter():
-            if 'doubleOrNilReasonTupleList' in elem.tag:
-                values = elem.text.strip().split()
-                temps.extend([float(v) for v in values if v not in ['NaN', '']])
+            if 'doubleOrNilReasonTupleList' in elem.tag and elem.text:
+                for tok in elem.text.strip().split():
+                    raw_values.append(None if tok == 'NaN' else float(tok))
 
-        # Find 6 AM temperature
-        morning_temp = None
-        if timestamps and temps and len(timestamps) == len(temps):
-            target_hour = 6
-            min_diff = float('inf')
-            for timestamp, temp in zip(timestamps, temps):
-                dt = datetime.fromtimestamp(timestamp)
-                hour_diff = abs(dt.hour - target_hour)
-                if hour_diff < min_diff:
-                    min_diff = hour_diff
-                    morning_temp = temp
+        n = len(params_order)
+        hourly = []
+        for i, ts in enumerate(timestamps):
+            chunk = raw_values[i * n:(i + 1) * n]
+            if len(chunk) < n or chunk[1] is None:
+                continue
+            temp, symbol = chunk[0], chunk[1]
+            # FMI's timestamp is Unix epoch (UTC) -> convert explicitly to
+            # local time rather than relying on this machine's default tz.
+            dt_local = datetime.fromtimestamp(ts, tz=timezone.utc).astimezone(LOCAL_TZ)
+            if dt_local.date() != tomorrow_date:
+                continue  # defensive: drop any stray hour outside tomorrow
+            hourly.append((dt_local, temp, int(symbol)))
 
-        if temps:
-            avg_temp = sum(temps) / len(temps)
-            return min(temps), max(temps), avg_temp, morning_temp
-        else:
-            print("No temps found!")
+        if not hourly:
+            print("No forecast data found!")
+            return None, None, None, None, []
+
+        temps = [t for _, t, _ in hourly]
+        avg_temp = sum(temps) / len(temps)
+
+        # 6 AM temperature (closest available local hour)
+        morning_temp = min(hourly, key=lambda h: abs(h[0].hour - 6))[1]
+
+        weather_word_lines = build_segment_lines(hourly)
+
+        return min(temps), max(temps), avg_temp, morning_temp, weather_word_lines
 
     except Exception as e:
         print(f"Exception: {e}")
         import traceback
         traceback.print_exc()
 
-    return None, None, None, None
+    return None, None, None, None, []
 
-# Get tomorrow's weather forecast (min/max/avg + 6 AM temp)
-min_temp, max_temp, avg_temp, morning_temp = get_tomorrow_forecast(latitude, longitude)
+# Get tomorrow's weather forecast (min/max/avg + 6 AM temp + weather words)
+min_temp, max_temp, avg_temp, morning_temp, weather_word_lines = get_tomorrow_forecast(latitude, longitude)
 
 # Planet list
 planets = ['Mercury', 'Venus', 'Earth', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto']
@@ -969,7 +1095,7 @@ if show_info_text:
 
 if show_info_text:
     # Fetch everything from sunrisesunset.io
-    print("FETCHING SUN/MOON DATA FROM SUNRISESUNSET.IO")
+    print("FETCHING SUNRISE/MOON PHASE DATA FROM SUNRISESUNSET.IO")
     sun_moon = get_sun_moon_data(latitude, longitude, horizons_date)
 
     # Timezone (for reference, already baked into returned times)
@@ -1050,10 +1176,13 @@ if min_temp is not None:
     weather_text = (
         f"{T['weather_header']}\n"
         f"{T['weather_minmax'].format(min=min_temp, max=max_temp)}\n"
-        f"{T['weather_avg'].format(avg=avg_temp)}"
+        f"{T['weather_avg'].format(avg=avg_temp)}\n"
     )
     if LANGUAGE == 'fi':
         weather_text = weather_text.replace('.', ',')
+
+    for line in weather_word_lines:
+        weather_text += f"\n{line}"
 
     info_boxes.append({'text': weather_text, 'color': 'white', 'is_moon': False})
 
