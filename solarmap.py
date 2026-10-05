@@ -441,7 +441,7 @@ def get_horizons_longitude(body_id, date_str, center="500@10", name=None):
             r = requests.get(url, params=params, timeout=15)
             if r.status_code == 503:
                 wait = 2 ** attempt
-                print(f"Information unavailable for {label}, retrying in {wait} s...")
+                print(f"Fetch failed for {label}, retrying in {wait} s...")
                 time.sleep(wait)
                 continue
             r.raise_for_status()
@@ -460,7 +460,7 @@ def get_horizons_longitude(body_id, date_str, center="500@10", name=None):
             x = float(data.split("X =")[1].split()[0])
             y = float(data.split("Y =")[1].split()[0])
             longitude = math.degrees(math.atan2(y, x)) % 360
-            print(f"{label} longitude fetched")
+            print(f"{label} longitude fetched.")
             return longitude
         except Exception as e:
             print(f"Fetch failed for {label}: {e}")
@@ -495,7 +495,6 @@ def fetch_all_horizons(fetch_list, date_str):
     return results
 
 # Fetch longitudes from Horizons (one request per planet)
-print("FETCHING PLANET LONGITUDES FROM JPL HORIZONS")
 planet_fetches = [{'name': n, 'body_id': HORIZONS_IDS[n], 'center': '500@10'} for n in planets]
 all_planet_results = fetch_all_horizons(planet_fetches, horizons_date)
 longitudes = {n: all_planet_results[n] for n in planets}
@@ -942,7 +941,6 @@ MOON_DATA = {
     },
 }
 
-print("FETCHING MOON LONGITUDES FROM JPL HORIZONS")
 moon_fetches = [{'name': n, 'body_id': d['body_id'], 'center': d['center']} for n, d in MOON_DATA.items()]
 all_moon_results = fetch_all_horizons(moon_fetches, horizons_date)
 moon_longitudes = {n: all_moon_results[n] for n in MOON_DATA}
@@ -1095,7 +1093,6 @@ if show_info_text:
 
 if show_info_text:
     # Fetch everything from sunrisesunset.io
-    print("FETCHING SUNRISE/MOON PHASE DATA FROM SUNRISESUNSET.IO")
     sun_moon = get_sun_moon_data(latitude, longitude, horizons_date)
 
     # Timezone (for reference, already baked into returned times)
@@ -1139,8 +1136,8 @@ if show_info_text:
     is_waxing  = is_waxing_val if is_waxing_val is not None else (illumination > 0.99)
 
     # Days to next full moon
-    print("Fetching next full moon from USNO...")
     days_to_full = get_next_full_moon(horizons_date)
+    print("Next full moon fetched.")
 
 
 
@@ -1230,7 +1227,7 @@ for i, box in enumerate(reversed(info_boxes)):
 
         # top-left inside the box
         moon_indicator_x = box_left + moon_radius + box_padding
-        moon_indicator_y = box_bottom + box_height - moon_radius - box_padding - 0.02
+        moon_indicator_y = box_bottom + box_height - moon_radius - box_padding - 0.0075
 
         # Draw dark gray base circle
         ax.add_patch(plt.Circle((moon_indicator_x, moon_indicator_y), moon_radius, 
