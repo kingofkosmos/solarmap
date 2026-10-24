@@ -111,7 +111,7 @@ STRINGS = {
         'last_quarter':     'Last quarter',
         'waning_crescent':  'Waning crescent',
         'days_to_full':     'days to full moon',
-        'daylight_header':  'Daylight:',
+        'daylight_header':  'Daylight',
         'daylight_time':    '{rise} - {set}',
         'daylight_hours':   'total {h} h {m} min',
         'morning_temp':     'Morning temperature: {temp:.1f} °C',
@@ -119,7 +119,7 @@ STRINGS = {
         'heating_05h':      '0.5 h',
         'heating_1h':       '1 h',
         'heating_2h':       '2 h',
-        'weather_header':   'Weather tomorrow:',
+        'weather_header':   'Weather tomorrow',
         'weather_minmax':   '{min:.1f}…{max:.1f} °C',
         'weather_avg':      'avg {avg:.1f} °C',
     }
@@ -189,6 +189,23 @@ def svg_to_imagebox(svg_path, zoom=0.1, color=None):
 
     return OffsetImage(image, zoom=zoom)
 
+def weather_svg_to_imagebox(svg_path, zoom=0.1, color="#ffffff"):
+    """Recolor weather icon artwork only, preserving transparent pixels."""
+    png_bytes = _svg_to_png_cached(svg_path)
+    image = mpimg.imread(io.BytesIO(png_bytes), format='png')
+    rgb = hex2color(color)
+
+    if image.shape[2] == 4:
+        visible = image[:, :, 3] > 0
+        for i in range(3):
+            image[:, :, i] = np.where(visible, rgb[i], image[:, :, i])
+    else:
+        mask = image[:, :, :3].mean(axis=2) < 0.95
+        for i in range(3):
+            image[:, :, i] = np.where(mask, rgb[i], image[:, :, i])
+
+    return OffsetImage(image, zoom=zoom)
+
 # Get current time
 if custom_date is None or custom_date == "Now":
     utc = datetime.datetime.now(datetime.timezone.utc)
@@ -248,12 +265,13 @@ SYMBOL_PRIORITY = {
     63: 8, 64: 9,
 }
 
-# Four parts of day: (name, start_hour_inclusive, end_hour_exclusive)
+# Forecast display order. The night segment uses 00:00–06:00 on the
+# following calendar day, i.e. the night after tomorrow's evening.
 SEGMENTS = [
-    ("night",     0,  6),
     ("morning",   6,  12),
     ("afternoon", 12, 18),
     ("evening",   18, 24),
+    ("night",      0,   6),
 ]
 
 SEGMENT_LABELS = {
@@ -269,39 +287,67 @@ def dominant_symbol(codes):
     return max(codes, key=lambda c: SYMBOL_PRIORITY.get(c, 0))
 
 
-def build_segment_lines(hourly):
-    """Build short weather-condition lines per part of day, merging
-    consecutive segments that end up with the same description."""
-    lang_idx = 0 if LANGUAGE == 'en' else 1
+# FMI WeatherSymbol3 code -> Meteocons SVG filename.
+# Clear and partly-cloudy icons use day/night variants based on the forecast segment.
+WEATHER_ICON_FILES = {
+    1:  ("clear-day.svg", "clear-night.svg"),
+    2:  ("partly-cloudy-day.svg", "partly-cloudy-night.svg"),
+    3:  ("cloudy.svg", "cloudy.svg"),
+    21: ("drizzle.svg", "drizzle.svg"),
+    22: ("rain.svg", "rain.svg"),
+    23: ("extreme-rain.svg", "extreme-rain.svg"),
+    31: ("drizzle.svg", "drizzle.svg"),
+    32: ("rain.svg", "rain.svg"),
+    33: ("extreme-rain.svg", "extreme-rain.svg"),
+    41: ("snow.svg", "snow.svg"),
+    42: ("snow.svg", "snow.svg"),
+    43: ("extreme-snow.svg", "extreme-snow.svg"),
+    51: ("snow.svg", "snow.svg"),
+    52: ("snow.svg", "snow.svg"),
+    53: ("extreme-snow.svg", "extreme-snow.svg"),
+    61: ("thunderstorms.svg", "thunderstorms.svg"),
+    62: ("extreme-thunderstorms.svg", "extreme-thunderstorms.svg"),
+    63: ("thunderstorms.svg", "thunderstorms.svg"),
+    64: ("extreme-thunderstorms.svg", "extreme-thunderstorms.svg"),
+    71: ("sleet.svg", "sleet.svg"),
+    72: ("sleet.svg", "sleet.svg"),
+    73: ("extreme-sleet.svg", "extreme-sleet.svg"),
+    81: ("sleet.svg", "sleet.svg"),
+    82: ("sleet.svg", "sleet.svg"),
+    83: ("extreme-sleet.svg", "extreme-sleet.svg"),
+    91: ("mist.svg", "mist.svg"),
+    92: ("fog.svg", "fog.svg"),
+}
 
+
+def build_segment_forecasts(tomorrow_hourly, following_night_hourly):
+    """Return tomorrow's morning/afternoon/evening and the following night."""
     segment_codes = {name: [] for name, _, _ in SEGMENTS}
-    for dt, temp, symbol in hourly:
+
+    for dt, temp, symbol in tomorrow_hourly:
         for name, start_h, end_h in SEGMENTS:
-            if start_h <= dt.hour < end_h:
+            if name != "night" and start_h <= dt.hour < end_h:
                 segment_codes[name].append(symbol)
                 break
 
-    segment_phrases = []
-    for name, _, _ in SEGMENTS:
-        codes = segment_codes[name]
-        if not codes:
-            continue
-        symbol = dominant_symbol(codes)
-        phrase = SYMBOL_PHRASES.get(symbol, ("?", "?"))[lang_idx]
-        segment_phrases.append((name, phrase))
+    for dt, temp, symbol in following_night_hourly:
+        if 0 <= dt.hour < 6:
+            segment_codes["night"].append(symbol)
 
-    merged = []
-    for name, phrase in segment_phrases:
-        if merged and merged[-1][1] == phrase:
-            merged[-1] = (merged[-1][0] + [name], phrase)
-        else:
-            merged.append(([name], phrase))
+    return [
+        (name, dominant_symbol(segment_codes[name]))
+        for name, _, _ in SEGMENTS
+        if segment_codes[name]
+    ]
 
-    lines = []
-    for names, phrase in merged:
-        labels = [SEGMENT_LABELS[n][lang_idx] for n in names]
-        lines.append(f"{'/'.join(labels)}: {phrase}")
-    return lines
+
+def weather_icon_path(segment_name, symbol):
+    """Resolve an FMI symbol and time-of-day to a local Meteocons SVG."""
+    day_icon, night_icon = WEATHER_ICON_FILES.get(
+        symbol, ("cloudy.svg", "cloudy.svg")
+    )
+    filename = night_icon if segment_name in ("night", "evening") else day_icon
+    return f"icons/weather/{filename}"
 
 
 def get_tomorrow_forecast(lat, lon):
@@ -316,7 +362,10 @@ def get_tomorrow_forecast(lat, lon):
     tomorrow_date = (datetime.now(LOCAL_TZ) + timedelta(days=1)).date()
     start_local = datetime(tomorrow_date.year, tomorrow_date.month, tomorrow_date.day,
                             0, 0, 0, tzinfo=LOCAL_TZ)
-    end_local = start_local + timedelta(hours=23, minutes=59)
+    # Include 00:00–05:59 on the following date for the final "night" row.
+    following_date = tomorrow_date + timedelta(days=1)
+    end_local = datetime(following_date.year, following_date.month, following_date.day,
+                         6, 0, 0, tzinfo=LOCAL_TZ)
 
     # Convert to real UTC before sending to FMI (handles EET/EEST correctly).
     start_utc = start_local.astimezone(timezone.utc)
@@ -366,6 +415,7 @@ def get_tomorrow_forecast(lat, lon):
 
         n = len(params_order)
         hourly = []
+        following_night_hourly = []
         for i, ts in enumerate(timestamps):
             chunk = raw_values[i * n:(i + 1) * n]
             if len(chunk) < n or chunk[1] is None:
@@ -374,9 +424,11 @@ def get_tomorrow_forecast(lat, lon):
             # FMI's timestamp is Unix epoch (UTC) -> convert explicitly to
             # local time rather than relying on this machine's default tz.
             dt_local = datetime.fromtimestamp(ts, tz=timezone.utc).astimezone(LOCAL_TZ)
-            if dt_local.date() != tomorrow_date:
-                continue  # defensive: drop any stray hour outside tomorrow
-            hourly.append((dt_local, temp, int(symbol)))
+            item = (dt_local, temp, int(symbol))
+            if dt_local.date() == tomorrow_date:
+                hourly.append(item)
+            elif dt_local.date() == following_date and dt_local.hour < 6:
+                following_night_hourly.append(item)
 
         if not hourly:
             print("No forecast data found!")
@@ -388,9 +440,9 @@ def get_tomorrow_forecast(lat, lon):
         # 6 AM temperature (closest available local hour)
         morning_temp = min(hourly, key=lambda h: abs(h[0].hour - 6))[1]
 
-        weather_word_lines = build_segment_lines(hourly)
+        weather_forecasts = build_segment_forecasts(hourly, following_night_hourly)
 
-        return min(temps), max(temps), avg_temp, morning_temp, weather_word_lines
+        return min(temps), max(temps), avg_temp, morning_temp, weather_forecasts
 
     except Exception as e:
         print(f"Exception: {e}")
@@ -400,7 +452,7 @@ def get_tomorrow_forecast(lat, lon):
     return None, None, None, None, []
 
 # Get tomorrow's weather forecast (min/max/avg + 6 AM temp + weather words)
-min_temp, max_temp, avg_temp, morning_temp, weather_word_lines = get_tomorrow_forecast(latitude, longitude)
+min_temp, max_temp, avg_temp, morning_temp, weather_forecasts = get_tomorrow_forecast(latitude, longitude)
 
 # Planet list
 planets = ['Mercury', 'Venus', 'Earth', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto']
@@ -1173,15 +1225,17 @@ if min_temp is not None:
     weather_text = (
         f"{T['weather_header']}\n"
         f"{T['weather_minmax'].format(min=min_temp, max=max_temp)}\n"
-        f"{T['weather_avg'].format(avg=avg_temp)}\n"
+        f"{T['weather_avg'].format(avg=avg_temp)}"
     )
     if LANGUAGE == 'fi':
         weather_text = weather_text.replace('.', ',')
 
-    for line in weather_word_lines:
-        weather_text += f"\n{line}"
-
-    info_boxes.append({'text': weather_text, 'color': 'white', 'is_moon': False})
+    info_boxes.append({
+        'text': weather_text,
+        'color': 'white',
+        'is_moon': False,
+        'weather_forecasts': weather_forecasts,
+    })
 
 # 3. Moon phase
 moon_text = f"\n\n\n{phase_name}\n{days_to_full:.0f} {T['days_to_full']}"
@@ -1204,23 +1258,60 @@ current_y = text_y
     
 for i, box in enumerate(reversed(info_boxes)):
     box_text = box['text']
-    # Count lines in this box
+    # Count text lines and reserve extra room for weather icon rows.
     num_lines = box_text.count('\n') + 1
     line_height = 0.035
-    box_height = num_lines * line_height + 2 * box_padding - 0.01
-    
+    weather_rows = box.get('weather_forecasts', [])
+    weather_row_height = 0.036  # Reduced by half to make forecast rows more compact
+    box_height = (
+        num_lines * line_height
+        + len(weather_rows) * weather_row_height
+        + 2 * box_padding - 0.01
+    )
+
     box_left = text_x - box_width
     box_bottom = current_y
-    
-    # Draw text inside box (left-aligned)
+
+    # Draw text inside box (left-aligned). Render weather summary lines
+    # separately so line breaks are always interpreted as line breaks.
     text_x_pos = box_left + box_padding
-    text_y_pos = box_bottom + box_padding
-    
-    ax.text(text_x_pos, text_y_pos, box_text,
-            color=box['color'], fontsize=11,
-            ha='left', va='bottom',
-            alpha=0.7, zorder=11)
-    
+    text_y_pos = box_bottom + box_padding + len(weather_rows) * weather_row_height
+
+    text_lines = box_text.splitlines()
+    for line_idx, line in enumerate(text_lines):
+        line_y = text_y_pos + (len(text_lines) - line_idx - 1) * line_height
+
+        # Keep only the requested headlines at the larger size.
+        is_headline = (
+            (bool(weather_rows) and line_idx == 0)
+            or (box.get('is_moon') and line == phase_name)
+            or (not weather_rows and not box.get('is_moon')
+                and line == T['daylight_header'])
+        )
+        font_size = 11 if is_headline else 9
+
+        ax.text(text_x_pos, line_y, line,
+                color=box['color'], fontsize=font_size,
+                ha='left', va='bottom',
+                alpha=0.7, zorder=11)
+
+    # Draw one forecast icon per available part of the day, with its label.
+    lang_idx = 0 if LANGUAGE == 'en' else 1
+    for row_idx, (segment_name, symbol) in enumerate(weather_rows):
+        row_y = box_bottom + box_padding + (len(weather_rows) - row_idx - 1) * weather_row_height
+        segment_label = SEGMENT_LABELS[segment_name][lang_idx]
+        ax.text(box_left + box_padding, row_y, segment_label,
+                color=box['color'], fontsize=9,
+                ha='left', va='center', alpha=0.7, zorder=11)
+
+        icon_path = weather_icon_path(segment_name, symbol)
+        icon_box = weather_svg_to_imagebox(icon_path, zoom=0.15, color="#ffffff")
+        # Keep icons close to their labels rather than at the far edge of the box.
+        icon_x = box_left + 0.23
+        ax.add_artist(AnnotationBbox(
+            icon_box, (icon_x, row_y), frameon=False, zorder=12
+        ))
+
     # Special handling for the moon phase box - add moon indicator
     if box['is_moon']:
         moon_radius = 0.03
