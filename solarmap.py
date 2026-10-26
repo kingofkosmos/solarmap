@@ -24,6 +24,21 @@ def parse_resolution(value):
         raise argparse.ArgumentTypeError("width and height must be positive integers")
     return width, height
 
+def parse_geolocation(value):
+    try:
+        latitude, longitude = map(float, value.split(","))
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            "geolocation must be in LATITUDE,LONGITUDE format, e.g. 60.17101,24.94148"
+        )
+    if not math.isfinite(latitude) or not math.isfinite(longitude):
+        raise argparse.ArgumentTypeError("latitude and longitude must be finite numbers")
+    if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
+        raise argparse.ArgumentTypeError(
+            "latitude must be between -90 and 90, and longitude between -180 and 180"
+        )
+    return latitude, longitude
+
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--language",
@@ -38,6 +53,13 @@ parser.add_argument(
     metavar="WIDTHxHEIGHT",
     help="Wallpaper resolution in pixels (default: 1920x1080)"
 )
+parser.add_argument(
+    "--geolocation",
+    type=parse_geolocation,
+    default=(60.17101, 24.94148),
+    metavar="LATITUDE,LONGITUDE",
+    help="Location coordinates (default: 60.17101,24.94148)"
+)
 args = parser.parse_args()
 
 
@@ -49,7 +71,6 @@ args = parser.parse_args()
 
 #TODO: Moon parallactic angle (tilt) based on observer's latitude and moon's position
 #TODO: Test different resolutions and aspect ratios
-#TODO: Move magic numbers to configuration
 #TODO: Comets (Halley, Hale-Bopp)
 #TODO: Realistic elliptical orbits (enables rest of the dwarf planets & astrology)
 ##      Astrology: Sky division to constellations, meanings of planets in different constellations
@@ -66,8 +87,7 @@ args = parser.parse_args()
 show_info_text = True  # Set to False to hide info text
 
 # Geolocation coordinates for weather forecast, moon phase and rise/set times
-latitude = 60.06977
-longitude = 23.66283
+latitude, longitude = args.geolocation
 
 # Custom time input
 custom_date = "Now"  # Options: None, "Now", "YYYY-MM-DD", or "YYYY-MM-DD HH:MM"
