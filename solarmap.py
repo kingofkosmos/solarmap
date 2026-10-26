@@ -13,12 +13,30 @@ import numpy as np
 import datetime
 import argparse
 
+def parse_resolution(value):
+    try:
+        width, height = map(int, value.lower().split("x"))
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            "resolution must be in WIDTHxHEIGHT format, e.g. 1920x1080"
+        )
+    if width <= 0 or height <= 0:
+        raise argparse.ArgumentTypeError("width and height must be positive integers")
+    return width, height
+
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--language",
     choices=["en", "fi"],
     default="en",
     help="Language for the generated map"
+)
+parser.add_argument(
+    "--resolution",
+    type=parse_resolution,
+    default=(1920, 1080),
+    metavar="WIDTHxHEIGHT",
+    help="Wallpaper resolution in pixels (default: 1920x1080)"
 )
 args = parser.parse_args()
 
@@ -31,7 +49,6 @@ args = parser.parse_args()
 
 #TODO: Moon parallactic angle (tilt) based on observer's latitude and moon's position
 #TODO: Test different resolutions and aspect ratios
-#TODO: Move supersample multiplier to configuration
 #TODO: Move magic numbers to configuration
 #TODO: Comets (Halley, Hale-Bopp)
 #TODO: Realistic elliptical orbits (enables rest of the dwarf planets & astrology)
@@ -57,6 +74,9 @@ custom_date = "Now"  # Options: None, "Now", "YYYY-MM-DD", or "YYYY-MM-DD HH:MM"
 
 # Orbital trails toggle
 trail_days = 100  # How long the trails are in days
+
+# Supersampling multiplier for final image antialiasing
+supersample_multiplier = 4
 
 # Planet colors
 planet_colors = {
@@ -89,7 +109,7 @@ STRINGS = {
         'last_quarter':     'Puolikuu (viimeinen neljännes)',
         'waning_crescent':  'Vähenevä sirppi',
         'days_to_full':     'pv täysikuuhun',
-        'daylight_header':  'Päivänvalo:',
+        'daylight_header':  'Päivänvalo',
         'daylight_time':    'klo {rise} - {set}',
         'daylight_hours':   'yht {h} t {m} min',
         'morning_temp':     'Lämpötila aamulla: {temp:.1f} °C',
@@ -97,7 +117,7 @@ STRINGS = {
         'heating_05h':      '0,5 h',
         'heating_1h':       '1 h',
         'heating_2h':       '2 h',
-        'weather_header':   'Sää huomenna:',
+        'weather_header':   'Sää huomenna',
         'weather_minmax':   '{min:.1f}…{max:.1f} °C',
         'weather_avg':      'ka {avg:.1f} °C',
     },
@@ -564,8 +584,7 @@ def longitude_to_theta(longitude):
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Set wallpaper resolution
-width_px = 1920
-height_px = 1080
+width_px, height_px = args.resolution
 
 reference_height = 1440
 reference_dpi = 100 # Reference DPI for scaling, change for bigger/smaller planets and stars
@@ -1391,9 +1410,8 @@ ax.text(date_x, date_y, f"{date_str}",
 plt.tight_layout()
 
 # Supersample entire image for antialiasing with overscan
-supersample_final = 4  # Render at 4x resolution
 overscan = 1.04  # 4 % extra on each side
-temp_dpi = int(dpi * supersample_final * overscan)
+temp_dpi = int(dpi * supersample_multiplier * overscan)
 
 # Save to memory buffer instead of file
 buffer = io.BytesIO()
@@ -1405,8 +1423,8 @@ img = Image.open(buffer)
 w, h = img.size
 
 # Calculate crop area (remove overscan)
-crop_w = int(width_px * supersample_final)
-crop_h = int(height_px * supersample_final)
+crop_w = int(width_px * supersample_multiplier)
+crop_h = int(height_px * supersample_multiplier)
 left = (w - crop_w) // 2
 top = (h - crop_h) // 2
 cropped = img.crop((left, top, left + crop_w, top + crop_h))
