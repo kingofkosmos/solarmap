@@ -36,13 +36,13 @@ python solarmap.py
 
 The script generates `solarmap.png` in the current directory. By default, the wallpaper resolution is `1920x1080`, the generated map is in English, and the location is Helsinki Central Railway Station (`60.17101,24.94148`).
 
-Use `--resolution WIDTHxHEIGHT` to choose an output resolution, `--language` to choose English (`en`) or Finnish (`fi`), and `--geolocation "LATITUDE, LONGITUDE"` to set the location for weather, moon phase, and sunrise/sunset data. Separate the coordinates with a comma and no spaces:
+Use `--resolution WIDTHxHEIGHT` to choose an output resolution, `--language` to choose English (`en`) or Finnish (`fi`), and `--geolocation "LATITUDE, LONGITUDE"` to set the location for weather, moon phase, and sunrise/sunset data. Separate the coordinates with a comma:
 
 ```bash
 python solarmap.py --resolution 2560x1440 --language fi --geolocation 60.17101,24.94148
 ```
 
-All arguments are optional. For example, `python solarmap.py --language fi` keeps the default resolution and location. If you include a space after the comma, quote the coordinate pair, e.g. `--geolocation "60.17101, 24.94148"`.
+All arguments are optional. For example, `python solarmap.py --language fi` keeps the default resolution and location.
 
 ## Configuration
 

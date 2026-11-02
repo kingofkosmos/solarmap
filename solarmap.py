@@ -1,4 +1,4 @@
-from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox, HPacker, TextArea
 from matplotlib.colors import hex2color
 from functools import lru_cache
 from zoneinfo import ZoneInfo
@@ -93,7 +93,7 @@ latitude, longitude = args.geolocation
 custom_date = "Now"  # Options: None, "Now", "YYYY-MM-DD", or "YYYY-MM-DD HH:MM"
 
 # Orbital trails toggle
-trail_days = 100  # How long the trails are in days
+trail_days = 100  # How long the trails are (in days)
 
 # Supersampling multiplier for final image antialiasing
 supersample_multiplier = 4
@@ -119,53 +119,32 @@ planet_colors = {
 LANGUAGE = args.language
 
 STRINGS = {
-    'fi': {
-        'full_moon':        'Täysikuu',
-        'new_moon':         'Uusikuu',
-        'waxing_gibbous':   'Kasvava kupera kuu',
-        'first_quarter':    'Puolikuu (ensimmäinen neljännes)',
-        'waxing_crescent':  'Kasvava sirppi',
-        'waning_gibbous':   'Vähenevä kupera kuu',
-        'last_quarter':     'Puolikuu (viimeinen neljännes)',
-        'waning_crescent':  'Vähenevä sirppi',
-        'days_to_full':     'pv täysikuuhun',
-        'daylight_header':  'Päivänvalo',
-        'daylight_time':    'klo {rise} - {set}',
-        'daylight_hours':   'yht {h} t {m} min',
-        'morning_temp':     'Lämpötila aamulla: {temp:.1f} °C',
-        'block_heater':     'Lohkolämmitin päälle {time} ajaksi',
-        'heating_05h':      '0,5 h',
-        'heating_1h':       '1 h',
-        'heating_2h':       '2 h',
-        'weather_header':   'Sää huomenna',
-        'weather_minmax':   '{min:.1f}…{max:.1f} °C',
-        'weather_avg':      'ka {avg:.1f} °C',
-    },
-    'en': {
-        'full_moon':        'Full moon',
-        'new_moon':         'New moon',
-        'waxing_gibbous':   'Waxing gibbous',
-        'first_quarter':    'First quarter',
-        'waxing_crescent':  'Waxing crescent',
-        'waning_gibbous':   'Waning gibbous',
-        'last_quarter':     'Last quarter',
-        'waning_crescent':  'Waning crescent',
-        'days_to_full':     'days to full moon',
-        'daylight_header':  'Daylight',
-        'daylight_time':    '{rise} - {set}',
-        'daylight_hours':   'total {h} h {m} min',
-        'morning_temp':     'Morning temperature: {temp:.1f} °C',
-        'block_heater':     'Block heater on for {time}',
-        'heating_05h':      '0.5 h',
-        'heating_1h':       '1 h',
-        'heating_2h':       '2 h',
-        'weather_header':   'Weather tomorrow',
-        'weather_minmax':   '{min:.1f}…{max:.1f} °C',
-        'weather_avg':      'avg {avg:.1f} °C',
-    }
+    #  key                 (fi,                                   en)
+    'full_moon':        ('Täysikuu',                           'Full moon'),
+    'new_moon':         ('Uusikuu',                            'New moon'),
+    'waxing_gibbous':   ('Kasvava kupera kuu',                 'Waxing gibbous'),
+    'first_quarter':    ('Puolikuu (ensimmäinen neljännes)',   'First quarter'),
+    'waxing_crescent':  ('Kasvava sirppi',                     'Waxing crescent'),
+    'waning_gibbous':   ('Vähenevä kupera kuu',                'Waning gibbous'),
+    'last_quarter':     ('Puolikuu (viimeinen neljännes)',     'Last quarter'),
+    'waning_crescent':  ('Vähenevä sirppi',                    'Waning crescent'),
+    'days_to_full':     ('pv täysikuuhun',                     'days to full moon'),
+    'daylight_header':  ('Päivänvalo',                         'Daylight'),
+    'daylight_time':    ('klo {rise} - {set}',                 '{rise} - {set}'),
+    'daylight_hours':   ('yht {h} t {m} min',                  'total {h} h {m} min'),
+    'morning_temp':     ('Lämpötila aamulla: {temp:.1f} °C',   'Morning temperature: {temp:.1f} °C'),
+    'block_heater':     ('Lohkolämmitin päälle {time} ajaksi', 'Block heater on for {time}'),
+    'heating_05h':      ('0,5 h',                              '0.5 h'),
+    'heating_1h':       ('1 h',                                '1 h'),
+    'heating_2h':       ('2 h',                                '2 h'),
+    'weather_header':   ('Sää huomenna',                       'Weather tomorrow'),
+    'weather_minmax':   ('{min:.1f}…{max:.1f} °C',             '{min:.1f}…{max:.1f} °C'),
+    'weather_avg':      ('ka {avg:.1f} °C',                    'avg {avg:.1f} °C'),
 }
 
-T = STRINGS[LANGUAGE]
+_IDX = {'fi': 0, 'en': 1}[LANGUAGE]
+T = {key: values[_IDX] for key, values in STRINGS.items()}
+
 
 
 
@@ -596,6 +575,7 @@ def longitude_to_theta(longitude):
     L = longitude % 360
     theta_deg = 0 - L
     return math.radians(-theta_deg)
+
 
 
 
@@ -1224,11 +1204,13 @@ if show_info_text:
 
     key, is_waxing_val = PHASE_MAP.get(phase_str, ('waxing_crescent', True))
     phase_name = T[key]
+    moon_phase_text = f"{phase_name} ({illumination * 100:.0f} %)"
     is_waxing  = is_waxing_val if is_waxing_val is not None else (illumination > 0.99)
 
     # Days to next full moon
     days_to_full = get_next_full_moon(horizons_date)
     print("Next full moon fetched.")
+
 
 
 
@@ -1277,7 +1259,7 @@ if min_temp is not None:
     })
 
 # 3. Moon phase
-moon_text = f"\n\n\n{phase_name}\n{days_to_full:.0f} {T['days_to_full']}"
+moon_text = f"\n\n\n{moon_phase_text}\n{days_to_full:.0f} {T['days_to_full']}"
 info_boxes.append({'text': moon_text, 'color': 'white', 'is_moon': True})
 
 # 4. Daylight
@@ -1320,10 +1302,35 @@ for i, box in enumerate(reversed(info_boxes)):
     for line_idx, line in enumerate(text_lines):
         line_y = text_y_pos + (len(text_lines) - line_idx - 1) * line_height
 
+        if box.get('is_moon') and line == moon_phase_text:
+            phase_label = TextArea(
+                phase_name,
+                textprops={'color': box['color'], 'fontsize': 11, 'alpha': 0.7},
+            )
+            illumination_label = TextArea(
+                f" ({illumination * 100:.0f} %)",
+                textprops={'color': box['color'], 'fontsize': 9, 'alpha': 0.7},
+            )
+            phase_line = HPacker(
+                children=[phase_label, illumination_label],
+                align='baseline',
+                pad=0,
+                sep=0,
+            )
+            ax.add_artist(AnnotationBbox(
+                phase_line,
+                (text_x_pos, line_y),
+                xycoords='data',
+                box_alignment=(0, 0),
+                frameon=False,
+                pad=0,
+                zorder=11,
+            ))
+            continue
+
         # Keep only the requested headlines at the larger size.
         is_headline = (
             (bool(weather_rows) and line_idx == 0)
-            or (box.get('is_moon') and line == phase_name)
             or (not weather_rows and not box.get('is_moon')
                 and line == T['daylight_header'])
         )
