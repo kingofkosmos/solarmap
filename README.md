@@ -53,4 +53,8 @@ Edit the configuration section in `solarmap.py`:
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details
+The project is licensed under the MIT License; see [LICENSE](LICENSE).
+
+The bundled [Weather Icons font](https://github.com/erikflowers/weather-icons)
+by Erik Flowers, with original icon designs by Lukas Bischoff, is licensed
+under the SIL Open Font License 1.1; see [icons/weather/OFL.txt](icons/weather/OFL.txt).

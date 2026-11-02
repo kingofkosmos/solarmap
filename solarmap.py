@@ -1,10 +1,16 @@
-from matplotlib.offsetbox import OffsetImage, AnnotationBbox, HPacker, TextArea
+from matplotlib.offsetbox import (
+    OffsetImage, AnnotationBbox, HPacker, TextArea, DrawingArea,
+)
+from matplotlib.font_manager import FontProperties
 from matplotlib.colors import hex2color
+from matplotlib.patches import PathPatch
+from matplotlib.textpath import TextPath
 from functools import lru_cache
 from zoneinfo import ZoneInfo
 from PIL import Image
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import math
+from collections import Counter
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import io
@@ -12,6 +18,10 @@ import cairosvg
 import numpy as np
 import datetime
 import argparse
+
+WEATHER_ICON_FONT = FontProperties(
+    fname="icons/weather/weathericons-regular-webfont.ttf"
+)
 
 def parse_resolution(value):
     try:
@@ -208,23 +218,6 @@ def svg_to_imagebox(svg_path, zoom=0.1, color=None):
 
     return OffsetImage(image, zoom=zoom)
 
-def weather_svg_to_imagebox(svg_path, zoom=0.1, color="#ffffff"):
-    """Recolor weather icon artwork only, preserving transparent pixels."""
-    png_bytes = _svg_to_png_cached(svg_path)
-    image = mpimg.imread(io.BytesIO(png_bytes), format='png')
-    rgb = hex2color(color)
-
-    if image.shape[2] == 4:
-        visible = image[:, :, 3] > 0
-        for i in range(3):
-            image[:, :, i] = np.where(visible, rgb[i], image[:, :, i])
-    else:
-        mask = image[:, :, :3].mean(axis=2) < 0.95
-        for i in range(3):
-            image[:, :, i] = np.where(mask, rgb[i], image[:, :, i])
-
-    return OffsetImage(image, zoom=zoom)
-
 # Get current time
 if custom_date is None or custom_date == "Now":
     utc = datetime.datetime.now(datetime.timezone.utc)
@@ -302,40 +295,47 @@ SEGMENT_LABELS = {
 
 
 def dominant_symbol(codes):
-    """Pick the most 'notable' code in a list (rain/snow/thunder beat clear)."""
-    return max(codes, key=lambda c: SYMBOL_PRIORITY.get(c, 0))
+    """Prefer precipitation; otherwise pick the most frequent sky condition."""
+    precipitation = [code for code in codes if SYMBOL_PRIORITY.get(code, 0) >= 5]
+    if precipitation:
+        return max(precipitation, key=lambda c: SYMBOL_PRIORITY.get(c, 0))
+
+    counts = Counter(codes)
+    return max(
+        counts,
+        key=lambda code: (counts[code], SYMBOL_PRIORITY.get(code, 0)),
+    )
 
 
-# FMI WeatherSymbol3 code -> Meteocons SVG filename.
-# Clear and partly-cloudy icons use day/night variants based on the forecast segment.
-WEATHER_ICON_FILES = {
-    1:  ("clear-day.svg", "clear-night.svg"),
-    2:  ("partly-cloudy-day.svg", "partly-cloudy-night.svg"),
-    3:  ("cloudy.svg", "cloudy.svg"),
-    21: ("drizzle.svg", "drizzle.svg"),
-    22: ("rain.svg", "rain.svg"),
-    23: ("extreme-rain.svg", "extreme-rain.svg"),
-    31: ("drizzle.svg", "drizzle.svg"),
-    32: ("rain.svg", "rain.svg"),
-    33: ("extreme-rain.svg", "extreme-rain.svg"),
-    41: ("snow.svg", "snow.svg"),
-    42: ("snow.svg", "snow.svg"),
-    43: ("extreme-snow.svg", "extreme-snow.svg"),
-    51: ("snow.svg", "snow.svg"),
-    52: ("snow.svg", "snow.svg"),
-    53: ("extreme-snow.svg", "extreme-snow.svg"),
-    61: ("thunderstorms.svg", "thunderstorms.svg"),
-    62: ("extreme-thunderstorms.svg", "extreme-thunderstorms.svg"),
-    63: ("thunderstorms.svg", "thunderstorms.svg"),
-    64: ("extreme-thunderstorms.svg", "extreme-thunderstorms.svg"),
-    71: ("sleet.svg", "sleet.svg"),
-    72: ("sleet.svg", "sleet.svg"),
-    73: ("extreme-sleet.svg", "extreme-sleet.svg"),
-    81: ("sleet.svg", "sleet.svg"),
-    82: ("sleet.svg", "sleet.svg"),
-    83: ("extreme-sleet.svg", "extreme-sleet.svg"),
-    91: ("mist.svg", "mist.svg"),
-    92: ("fog.svg", "fog.svg"),
+# FMI WeatherSymbol3 code -> Weather Icons font glyphs (day, night).
+WEATHER_ICON_CODES = {
+    1:  (0xf00d, 0xf02e),  # sunny / clear night
+    2:  (0xf002, 0xf083),  # partly cloudy
+    3:  (0xf013, 0xf013),  # cloudy
+    21: (0xf00b, 0xf02b),  # drizzle
+    22: (0xf008, 0xf028),  # rain
+    23: (0xf007, 0xf027),  # rain and wind
+    31: (0xf00b, 0xf02b),
+    32: (0xf008, 0xf028),
+    33: (0xf007, 0xf027),
+    41: (0xf00a, 0xf02a),  # snow
+    42: (0xf00a, 0xf02a),
+    43: (0xf065, 0xf067),  # blowing snow
+    51: (0xf00a, 0xf02a),
+    52: (0xf00a, 0xf02a),
+    53: (0xf065, 0xf067),
+    61: (0xf010, 0xf02d),  # thunderstorm
+    62: (0xf00e, 0xf02c),  # storm showers
+    63: (0xf010, 0xf02d),
+    64: (0xf00e, 0xf02c),
+    71: (0xf0b2, 0xf0b4),  # sleet
+    72: (0xf0b2, 0xf0b4),
+    73: (0xf068, 0xf06a),  # sleet storm
+    81: (0xf0b2, 0xf0b4),
+    82: (0xf0b2, 0xf0b4),
+    83: (0xf068, 0xf06a),
+    91: (0xf003, 0xf04a),  # mist
+    92: (0xf014, 0xf014),  # fog
 }
 
 
@@ -360,13 +360,71 @@ def build_segment_forecasts(tomorrow_hourly, following_night_hourly):
     ]
 
 
-def weather_icon_path(segment_name, symbol):
-    """Resolve an FMI symbol and time-of-day to a local Meteocons SVG."""
-    day_icon, night_icon = WEATHER_ICON_FILES.get(
-        symbol, ("cloudy.svg", "cloudy.svg")
+def weather_icon_code(segment_name, symbol):
+    """Resolve an FMI symbol and time-of-day to a Weather Icons glyph."""
+    day_code, night_code = WEATHER_ICON_CODES.get(symbol, (0xf013, 0xf013))
+    return night_code if segment_name in ("night", "evening") else day_code
+
+
+def weather_icon_box(glyph_code, color="#ffffff", size=13):
+    """Create a vector icon box from a Weather Icons font glyph."""
+    glyph = chr(glyph_code)
+    path = TextPath((0, 0), glyph, size=size, prop=WEATHER_ICON_FONT)
+    bounds = path.get_extents()
+    padding = 2
+    icon_box = DrawingArea(bounds.width + padding * 2, bounds.height + padding * 2)
+    icon_box.add_artist(PathPatch(
+        TextPath(
+            (padding - bounds.x0, padding - bounds.y0),
+            glyph,
+            size=size,
+            prop=WEATHER_ICON_FONT,
+        ),
+        color=color,
+        linewidth=0,
+    ))
+    return icon_box
+
+
+def log_fmi_weather_debug(hourly, following_night_hourly):
+    """Print the hourly FMI values used to build the forecast."""
+    print(
+        f"[weather-debug] FMI forecast received "
+        f"(local time: {LOCAL_TZ.key}; WeatherSymbol3 codes):"
     )
-    filename = night_icon if segment_name in ("night", "evening") else day_icon
-    return f"icons/weather/{filename}"
+    for dt_local, temp, symbol in sorted(
+        hourly + following_night_hourly, key=lambda item: item[0]
+    ):
+        english, finnish = SYMBOL_PHRASES.get(
+            symbol, ("unknown symbol", "tuntematon sää")
+        )
+        temperature = "unavailable" if temp is None else f"{temp:.1f} °C"
+        print(
+            f"  {dt_local:%Y-%m-%d %H:%M} | {temperature} | "
+            f"{symbol}: {english} / {finnish}"
+        )
+
+
+def log_grouped_weather_debug(weather_forecasts):
+    """Print the grouped forecast and icon glyphs used by the display."""
+    print("[weather-debug] Grouped forecast used by the display:")
+    forecast_by_segment = dict(weather_forecasts)
+    language_index = 0 if LANGUAGE == "en" else 1
+    for segment_name, _, _ in SEGMENTS:
+        label = SEGMENT_LABELS[segment_name][language_index]
+        if segment_name not in forecast_by_segment:
+            print(f"  {label}: no data (not displayed)")
+            continue
+
+        symbol = forecast_by_segment[segment_name]
+        phrase = SYMBOL_PHRASES.get(
+            symbol, ("unknown symbol", "tuntematon sää")
+        )[language_index]
+        icon_code = weather_icon_code(segment_name, symbol)
+        print(
+            f"  {label}: {phrase} "
+            f"(WeatherSymbol3={symbol}, icon=U+{icon_code:04X})"
+        )
 
 
 def get_tomorrow_forecast(lat, lon):
@@ -380,7 +438,7 @@ def get_tomorrow_forecast(lat, lon):
     # whatever timezone this machine happens to be set to.
     tomorrow_date = (datetime.now(LOCAL_TZ) + timedelta(days=1)).date()
     start_local = datetime(tomorrow_date.year, tomorrow_date.month, tomorrow_date.day,
-                            0, 0, 0, tzinfo=LOCAL_TZ)
+                            6, 0, 0, tzinfo=LOCAL_TZ)
     # Include 00:00–05:59 on the following date for the final "night" row.
     following_date = tomorrow_date + timedelta(days=1)
     end_local = datetime(following_date.year, following_date.month, following_date.day,
@@ -449,6 +507,8 @@ def get_tomorrow_forecast(lat, lon):
             elif dt_local.date() == following_date and dt_local.hour < 6:
                 following_night_hourly.append(item)
 
+        log_fmi_weather_debug(hourly, following_night_hourly)
+
         if not hourly:
             print("No forecast data found!")
             return None, None, None, None, []
@@ -460,6 +520,7 @@ def get_tomorrow_forecast(lat, lon):
         morning_temp = min(hourly, key=lambda h: abs(h[0].hour - 6))[1]
 
         weather_forecasts = build_segment_forecasts(hourly, following_night_hourly)
+        log_grouped_weather_debug(weather_forecasts)
 
         return min(temps), max(temps), avg_temp, morning_temp, weather_forecasts
 
@@ -1350,10 +1411,9 @@ for i, box in enumerate(reversed(info_boxes)):
                 color=box['color'], fontsize=9,
                 ha='left', va='center', alpha=0.7, zorder=11)
 
-        icon_path = weather_icon_path(segment_name, symbol)
-        icon_box = weather_svg_to_imagebox(icon_path, zoom=0.15, color="#ffffff")
-        # Keep icons close to their labels rather than at the far edge of the box.
+        icon_code = weather_icon_code(segment_name, symbol)
         icon_x = box_left + 0.23
+        icon_box = weather_icon_box(icon_code)
         ax.add_artist(AnnotationBbox(
             icon_box, (icon_x, row_y), frameon=False, zorder=12
         ))
