@@ -32,14 +32,27 @@ pip install -r requirements.txt
 python solarmap.py
 ```
 
-The script generates `solarmap.png` in the current directory.
+The script generates `solarmap.png` in the current directory. By default, the
+wallpaper resolution is `1920x1080` and the location is Helsinki Central Railway
+Station (`60.17101,24.94148`).
+
+Use `--resolution WIDTHxHEIGHT` to choose an output resolution and
+`--geolocation LATITUDE,LONGITUDE` to set the location used for moon and
+sunrise/sunset data:
+
+```bash
+python solarmap.py --resolution 2560x1440 --geolocation 60.17101,24.94148
+```
+
+Both arguments are optional.
 
 ## Configuration
 
 Edit the configuration section in `solarmap.py`:
 
-- `width_px`, `height_px` - Output resolution
-- `latitude`, `longitude` - Your location for weather/sunrise times
+- `width_px`, `height_px` - Output resolution (overridden by `--resolution`)
+- `latitude`, `longitude` - Your location (overridden by `--geolocation`)
+- `supersample_multiplier` - Antialiasing render scale
 - `custom_date` - Set a specific date or use "Now"
 - `planet_colors` - Customize planet colors
 

@@ -1,5 +1,5 @@
 from astronomy import Time, Body, EclipticLongitude, GeoVector, Observer, SearchRiseSet, Direction, Illumination, SearchMoonPhase, JupiterMoons
-from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox, HPacker, TextArea
 from matplotlib.colors import hex2color
 from functools import lru_cache
 from zoneinfo import ZoneInfo
@@ -13,12 +13,52 @@ import numpy as np
 import datetime
 import argparse
 
+def parse_resolution(value):
+    try:
+        width, height = map(int, value.lower().split("x"))
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            "resolution must be in WIDTHxHEIGHT format, e.g. 1920x1080"
+        )
+    if width <= 0 or height <= 0:
+        raise argparse.ArgumentTypeError("width and height must be positive integers")
+    return width, height
+
+def parse_geolocation(value):
+    try:
+        latitude, longitude = map(float, value.split(","))
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            "geolocation must be in LATITUDE,LONGITUDE format, e.g. 60.17101,24.94148"
+        )
+    if not math.isfinite(latitude) or not math.isfinite(longitude):
+        raise argparse.ArgumentTypeError("latitude and longitude must be finite numbers")
+    if not -90 <= latitude <= 90 or not -180 <= longitude <= 180:
+        raise argparse.ArgumentTypeError(
+            "latitude must be between -90 and 90, and longitude between -180 and 180"
+        )
+    return latitude, longitude
+
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--language",
     choices=["en", "fi"],
     default="en",
     help="Language for the generated map"
+)
+parser.add_argument(
+    "--resolution",
+    type=parse_resolution,
+    default=(1920, 1080),
+    metavar="WIDTHxHEIGHT",
+    help="Wallpaper resolution in pixels (default: 1920x1080)"
+)
+parser.add_argument(
+    "--geolocation",
+    type=parse_geolocation,
+    default=(60.17101, 24.94148),
+    metavar="LATITUDE,LONGITUDE",
+    help="Location coordinates (default: 60.17101,24.94148)"
 )
 args = parser.parse_args()
 
@@ -29,9 +69,7 @@ args = parser.parse_args()
 # ═══════════════════════════════════════════════════════════════════════════
 
 #TODO: Test different resolutions and aspect ratios
-#TODO: Move supersample multiplier to configuration
 #TODO: Move magic numbers to configuration
-#TODO: Automatic wallpaper generation in Github Actions?
 #TODO: Comets (Halley, Hale-Bopp)
 #TODO: Realistic elliptical orbits (enables rest of the dwarf planets & astrology)
 ##      Astrology: Sky division to constellations, meanings of planets in different constellations
@@ -48,14 +86,16 @@ args = parser.parse_args()
 show_info_text = True  # Set to False to hide info text
 
 # Geolocation coordinates for weather forecast, moon phase and rise/set times
-latitude = 60.06977
-longitude = 23.66283
+latitude, longitude = args.geolocation
 
 # Custom time input
 custom_date = "Now"  # Options: None, "Now", "YYYY-MM-DD", or "YYYY-MM-DD HH:MM"
 
 # Orbital trails toggle
 trail_days = 100  # How long the trails are in days
+
+# Supersampling multiplier for final image antialiasing
+supersample_multiplier = 4
 
 # Planet colors
 planet_colors = {
@@ -208,8 +248,7 @@ def longitude_to_theta(longitude):
 # ═══════════════════════════════════════════════════════════════════════════
 
 # Set wallpaper resolution
-width_px = 1920
-height_px = 1080
+width_px, height_px = args.resolution
 
 reference_height = 1440
 reference_dpi = 100 # Reference DPI for scaling, change for bigger/smaller planets and stars
@@ -858,7 +897,8 @@ if show_info_text:
 info_boxes = []
 
 # 1. Moon phase
-moon_text = f"\n\n\n{phase_name}\n{days_to_full:.0f} {T['days_to_full']}"
+moon_phase_text = f"{phase_name} ({illumination * 100:.0f} %)"
+moon_text = f"\n\n\n{moon_phase_text}\n{days_to_full:.0f} {T['days_to_full']}"
 info_boxes.append(moon_text)
 
 # 2. Daylight
@@ -891,10 +931,40 @@ for i, box_text in enumerate(reversed(info_boxes)):
     text_x_pos = box_left + box_padding
     text_y_pos = box_bottom + box_padding
     
-    ax.text(text_x_pos, text_y_pos, box_text,
-            color='white', fontsize=11,
-            ha='left', va='bottom',
-            alpha=0.7, zorder=11)
+    text_lines = box_text.splitlines()
+    for line_idx, line in enumerate(text_lines):
+        line_y = text_y_pos + (len(text_lines) - line_idx - 1) * line_height
+
+        if i == len(info_boxes) - 1 and line == moon_phase_text:
+            phase_label = TextArea(
+                phase_name,
+                textprops={'color': 'white', 'fontsize': 11, 'alpha': 0.7},
+            )
+            illumination_label = TextArea(
+                f" ({illumination * 100:.0f} %)",
+                textprops={'color': 'white', 'fontsize': 9, 'alpha': 0.7},
+            )
+            phase_line = HPacker(
+                children=[phase_label, illumination_label],
+                align='baseline',
+                pad=0,
+                sep=0,
+            )
+            ax.add_artist(AnnotationBbox(
+                phase_line,
+                (text_x_pos, line_y),
+                xycoords='data',
+                box_alignment=(0, 0),
+                frameon=False,
+                pad=0,
+                zorder=11,
+            ))
+            continue
+
+        ax.text(text_x_pos, line_y, line,
+                color='white', fontsize=9,
+                ha='left', va='bottom',
+                alpha=0.7, zorder=11)
     
     # Special handling for first box (moon phase) - add moon indicator
     if i == len(info_boxes) - 1:
@@ -975,9 +1045,8 @@ ax.text(date_x, date_y, f"{date_str}",
 plt.tight_layout()
 
 # Supersample entire image for antialiasing with overscan
-supersample_final = 4  # Render at 4x resolution
 overscan = 1.04  # 4 % extra on each side
-temp_dpi = int(dpi * supersample_final * overscan)
+temp_dpi = int(dpi * supersample_multiplier * overscan)
 
 # Save to memory buffer instead of file
 buffer = io.BytesIO()
@@ -989,8 +1058,8 @@ img = Image.open(buffer)
 w, h = img.size
 
 # Calculate crop area (remove overscan)
-crop_w = int(width_px * supersample_final)
-crop_h = int(height_px * supersample_final)
+crop_w = int(width_px * supersample_multiplier)
+crop_h = int(height_px * supersample_multiplier)
 left = (w - crop_w) // 2
 top = (h - crop_h) // 2
 cropped = img.crop((left, top, left + crop_w, top + crop_h))
