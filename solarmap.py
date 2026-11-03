@@ -1265,7 +1265,20 @@ if show_info_text:
 
     key, is_waxing_val = PHASE_MAP.get(phase_str, ('waxing_crescent', True))
     phase_name = T[key]
-    moon_phase_text = f"{phase_name} ({illumination * 100:.0f} %)"
+    finnish_quarter_labels = {
+        'First Quarter': ('Puolikuu', '(ensimmäinen neljännes)'),
+        'Last Quarter': ('Puolikuu', '(viimeinen neljännes)'),
+    }
+    finnish_quarter_label = (
+        finnish_quarter_labels.get(phase_str) if LANGUAGE == 'fi' else None
+    )
+    if finnish_quarter_label:
+        moon_phase_text = (
+            f"{finnish_quarter_label[0]}\n"
+            f"{finnish_quarter_label[1]} ({illumination * 100:.0f} %)"
+        )
+    else:
+        moon_phase_text = f"{phase_name} ({illumination * 100:.0f} %)"
     is_waxing  = is_waxing_val if is_waxing_val is not None else (illumination > 0.99)
 
     # Days to next full moon
@@ -1344,7 +1357,7 @@ for i, box in enumerate(reversed(info_boxes)):
     num_lines = box_text.count('\n') + 1
     line_height = 0.035
     weather_rows = box.get('weather_forecasts', [])
-    weather_row_height = 0.036  # Reduced by half to make forecast rows more compact
+    weather_row_height = 0.04  # Adjusts vertical spacing for weather icons and labels
     box_height = (
         num_lines * line_height
         + len(weather_rows) * weather_row_height
@@ -1362,6 +1375,20 @@ for i, box in enumerate(reversed(info_boxes)):
     text_lines = box_text.splitlines()
     for line_idx, line in enumerate(text_lines):
         line_y = text_y_pos + (len(text_lines) - line_idx - 1) * line_height
+
+        if (
+            box.get('is_moon')
+            and finnish_quarter_label
+            and line in (
+                finnish_quarter_label[0],
+                f"{finnish_quarter_label[1]} ({illumination * 100:.0f} %)",
+            )
+        ):
+            ax.text(text_x_pos, line_y, line,
+                    color=box['color'],
+                    fontsize=11 if line == finnish_quarter_label[0] else 9,
+                    ha='left', va='bottom', alpha=0.7, zorder=11)
+            continue
 
         if box.get('is_moon') and line == moon_phase_text:
             phase_label = TextArea(
