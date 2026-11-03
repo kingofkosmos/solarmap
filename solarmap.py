@@ -141,7 +141,7 @@ STRINGS = {
     'days_to_full':     ('pv täysikuuhun',                     'days to full moon'),
     'daylight_header':  ('Päivänvalo',                         'Daylight'),
     'daylight_time':    ('klo {rise} - {set}',                 '{rise} - {set}'),
-    'daylight_hours':   ('yht {h} t {m} min',                  'total {h} h {m} min'),
+    'daylight_hours':   ('{h} t {m} min',                      '{h} h {m} min'),
     'morning_temp':     ('Lämpötila aamulla: {temp:.1f} °C',   'Morning temperature: {temp:.1f} °C'),
     'block_heater':     ('Lohkolämmitin päälle {time} ajaksi', 'Block heater on for {time}'),
     'heating_05h':      ('0,5 h',                              '0.5 h'),
@@ -366,7 +366,7 @@ def weather_icon_code(segment_name, symbol):
     return night_code if segment_name in ("night", "evening") else day_code
 
 
-def weather_icon_box(glyph_code, color="#ffffff", size=13):
+def weather_icon_box(glyph_code, color="#ffffff", size=13, alpha=1.0):
     """Create a vector icon box from a Weather Icons font glyph."""
     glyph = chr(glyph_code)
     path = TextPath((0, 0), glyph, size=size, prop=WEATHER_ICON_FONT)
@@ -382,6 +382,7 @@ def weather_icon_box(glyph_code, color="#ffffff", size=13):
         ),
         color=color,
         linewidth=0,
+        alpha=alpha,
     ))
     return icon_box
 
@@ -1342,7 +1343,12 @@ daylight_text = (
     f"{T['daylight_time'].format(rise=sunrise_time, set=sunset_time)}\n"
     f"{T['daylight_hours'].format(h=daylight_hours, m=daylight_mins)}"
 )
-info_boxes.append({'text': daylight_text, 'color': 'white', 'is_moon': False})
+info_boxes.append({
+    'text': daylight_text,
+    'color': 'white',
+    'is_moon': False,
+    'is_daylight': True,
+})
 
 
 # Draw stacked info boxes
@@ -1375,6 +1381,43 @@ for i, box in enumerate(reversed(info_boxes)):
     text_lines = box_text.splitlines()
     for line_idx, line in enumerate(text_lines):
         line_y = text_y_pos + (len(text_lines) - line_idx - 1) * line_height
+
+        if box.get('is_daylight') and line_idx in (0, 1):
+            text_props = {'color': box['color'], 'fontsize': 9, 'alpha': 0.7}
+            if line_idx == 0:
+                children = [
+                    weather_icon_box(0xf051, size=12, alpha=0.7),
+                    TextArea(f" {sunrise_time}  ", textprops=text_props),
+                    weather_icon_box(0xf052, size=12, alpha=0.7),
+                    TextArea(f" {sunset_time}", textprops=text_props),
+                ]
+            else:
+                children = [
+                    weather_icon_box(0xf00d, size=12, alpha=0.7),
+                    TextArea(
+                        f" {T['daylight_hours'].format(h=daylight_hours, m=daylight_mins)}",
+                        textprops=text_props,
+                    ),
+                ]
+            daylight_line = HPacker(
+                children=children,
+                align='center',
+                pad=0,
+                sep=0,
+            )
+            ax.add_artist(AnnotationBbox(
+                daylight_line,
+                (text_x_pos, line_y),
+                xycoords='data',
+                box_alignment=(0, 0),
+                frameon=False,
+                pad=0,
+                zorder=11,
+            ))
+            continue
+
+        if box.get('is_daylight'):
+            continue
 
         if (
             box.get('is_moon')
@@ -1417,11 +1460,7 @@ for i, box in enumerate(reversed(info_boxes)):
             continue
 
         # Keep only the requested headlines at the larger size.
-        is_headline = (
-            (bool(weather_rows) and line_idx == 0)
-            or (not weather_rows and not box.get('is_moon')
-                and line == T['daylight_header'])
-        )
+        is_headline = bool(weather_rows) and line_idx == 0
         font_size = 11 if is_headline else 9
 
         ax.text(text_x_pos, line_y, line,
