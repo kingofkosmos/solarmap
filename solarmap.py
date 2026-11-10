@@ -1361,9 +1361,9 @@ for i, box in enumerate(reversed(info_boxes)):
     box_text = box['text']
     # Count text lines and reserve extra room for weather icon rows.
     num_lines = box_text.count('\n') + 1
-    line_height = 0.035
+    line_height = 0.04 if box.get('is_daylight') else 0.035
     weather_rows = box.get('weather_forecasts', [])
-    weather_row_height = 0.04  # Adjusts vertical spacing for weather icons and labels
+    weather_row_height = 0.045  # Adjusts vertical spacing for weather icons and labels
     box_height = (
         num_lines * line_height
         + len(weather_rows) * weather_row_height
@@ -1386,14 +1386,14 @@ for i, box in enumerate(reversed(info_boxes)):
             text_props = {'color': box['color'], 'fontsize': 9, 'alpha': 0.7}
             if line_idx == 0:
                 children = [
-                    weather_icon_box(0xf051, size=12, alpha=0.7),
+                    weather_icon_box(0xf051, size=10, alpha=0.7),
                     TextArea(f" {sunrise_time}  ", textprops=text_props),
-                    weather_icon_box(0xf052, size=12, alpha=0.7),
+                    weather_icon_box(0xf052, size=10, alpha=0.7),
                     TextArea(f" {sunset_time}", textprops=text_props),
                 ]
             else:
                 children = [
-                    weather_icon_box(0xf00d, size=12, alpha=0.7),
+                    weather_icon_box(0xf00d, size=11, alpha=0.7),
                     TextArea(
                         f" {T['daylight_hours'].format(h=daylight_hours, m=daylight_mins)}",
                         textprops=text_props,
