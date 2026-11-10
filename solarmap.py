@@ -1115,12 +1115,10 @@ for moon_name, data in MOON_DATA.items():
     x = px + orbit_r * math.cos(theta)
     y = py + orbit_r * math.sin(theta)
 
-    # Plot icon
     imagebox = svg_to_imagebox("icons/moon.svg", zoom=data['zoom'], color=data['color'])
     ax.add_artist(AnnotationBbox(imagebox, (x, y), frameon=False))
 
 # Trail — cap at one full orbit
-    max_degrees = 360.0
     degrees_back = 360.0 * data['trail_fraction']
     current_theta_deg = 0 - lon
     arc_span = degrees_back
@@ -1227,10 +1225,6 @@ if show_info_text:
 if show_info_text:
     # Fetch everything from sunrisesunset.io
     sun_moon = get_sun_moon_data(latitude, longitude, horizons_date)
-
-    # Timezone (for reference, already baked into returned times)
-    tz_name    = sun_moon.get('timezone', 'UTC')
-    utc_offset = sun_moon.get('utc_offset', 0)
 
     # Sunrise / sunset
     sunrise_raw = sun_moon['sunrise']   # e.g. "05:12:34"
@@ -1357,7 +1351,7 @@ box_spacing = 0.0
 box_padding = 0.015
 current_y = text_y
     
-for i, box in enumerate(reversed(info_boxes)):
+for box in reversed(info_boxes):
     box_text = box['text']
     # Count text lines and reserve extra room for weather icon rows.
     num_lines = box_text.count('\n') + 1
@@ -1488,59 +1482,32 @@ for i, box in enumerate(reversed(info_boxes)):
     if box['is_moon']:
         moon_radius = 0.03
 
-        # top-left inside the box
         moon_indicator_x = box_left + moon_radius + box_padding
         moon_indicator_y = box_bottom + box_height - moon_radius - box_padding - 0.0075
 
-        # Draw dark gray base circle
         ax.add_patch(plt.Circle((moon_indicator_x, moon_indicator_y), moon_radius, 
                                 fill=True, color='#404040', alpha=0.9, zorder=12))
         
-        # Draw illuminated part
         if illumination > 0.01:
             theta = np.linspace(np.pi/2, -np.pi/2, 100)
-            
-            if is_waxing:
-                # Right side lit
-                x_outer = moon_indicator_x + moon_radius * np.cos(theta)
-                y_outer = moon_indicator_y + moon_radius * np.sin(theta)
-                
-                curve_amount = abs(illumination - 0.5) * 2
-                ellipse_width = curve_amount * moon_radius
-                
-                if illumination < 0.5:
-                    x_terminator = moon_indicator_x + ellipse_width * np.cos(theta)
-                else:
-                    x_terminator = moon_indicator_x - ellipse_width * np.cos(theta)
-                y_terminator = moon_indicator_y + moon_radius * np.sin(theta)
-                
-                x_lit = np.concatenate([x_outer, x_terminator[::-1]])
-                y_lit = np.concatenate([y_outer, y_terminator[::-1]])
-                
-                ax.fill(x_lit, y_lit, color='white', alpha=0.9, zorder=13, linewidth=0)
-            else:
-                # Left side lit
-                x_outer = moon_indicator_x - moon_radius * np.cos(theta)
-                y_outer = moon_indicator_y + moon_radius * np.sin(theta)
-                
-                curve_amount = abs(illumination - 0.5) * 2
-                ellipse_width = curve_amount * moon_radius
-                
-                if illumination > 0.5:
-                    x_terminator = moon_indicator_x + ellipse_width * np.cos(theta)
-                else:
-                    x_terminator = moon_indicator_x - ellipse_width * np.cos(theta)
-                y_terminator = moon_indicator_y + moon_radius * np.sin(theta)
-                
-                x_lit = np.concatenate([x_outer, x_terminator[::-1]])
-                y_lit = np.concatenate([y_outer, y_terminator[::-1]])
-                
-                ax.fill(x_lit, y_lit, color='white', alpha=0.9, zorder=13, linewidth=0)
+            lit_direction = 1 if is_waxing else -1
+            terminator_direction = lit_direction * (1 if illumination < 0.5 else -1)
+            curve_amount = abs(illumination - 0.5) * 2
+            ellipse_width = curve_amount * moon_radius
 
-    # Move up for next box
+            x_outer = moon_indicator_x + lit_direction * moon_radius * np.cos(theta)
+            x_terminator = (
+                moon_indicator_x
+                + terminator_direction * ellipse_width * np.cos(theta)
+            )
+            y_outer = moon_indicator_y + moon_radius * np.sin(theta)
+
+            x_lit = np.concatenate([x_outer, x_terminator[::-1]])
+            y_lit = np.concatenate([y_outer, y_outer[::-1]])
+            ax.fill(x_lit, y_lit, color='white', alpha=0.9, zorder=13, linewidth=0)
+
     current_y += box_height + box_spacing
 
-# Plot date separately in bottom right corner
 if fig_aspect > 1:
     date_x = 1.3 * aspect - 0.07
     date_y = -1.3 + 0.05
